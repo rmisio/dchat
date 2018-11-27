@@ -1,0 +1,12 @@
+@import '../style/mixins.scss';
+
+.Register {
+  min-width: 150px;
+  max-width: 250px;
+  width: 100%;
+  @include center();
+
+  .seed {
+    padding: 5px;
+  }
+}

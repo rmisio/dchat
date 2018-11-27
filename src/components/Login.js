@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import { Link } from 'react-router-dom';
 import '../style/util.scss';
 import '../style/layout.scss';
 import './Login.scss';
@@ -6,11 +7,7 @@ import './Login.scss';
 class Login extends Component {
   constructor(props) {
     super(props);
-    this.state = { seed: '' };
     this.handleInputChange = this.handleInputChange.bind(this);
-    this.handleLoginClick = this.handleLoginClick.bind(this);
-    console.log('mad props');
-    window.props = props;
   }
 
   handleInputChange(event) {
@@ -21,10 +18,6 @@ class Login extends Component {
     this.setState({
       [name]: value
     });
-  }
-
-  handleLoginClick() {
-    this.props.onLogin(this.state.seed);
   }
 
   render() {
@@ -39,10 +32,10 @@ class Login extends Component {
           onChange={this.handleInputChange} />
         <div className="flexVCent">
           <div className="flexNoShrink">
-            <a>I don't have a seed 😞</a>
+            <Link to="/register">I don't have a seed 😞</Link>
           </div>
           <div className="flexHRight">
-            <button onClick={this.handleLoginClick}>Login</button>
+            <button onClick={() => this.props.onLogin(this.state.seed)}>Login</button>
           </div>
         </div>
       </div>
