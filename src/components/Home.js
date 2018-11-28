@@ -1,12 +1,8 @@
 import React, { Component } from 'react';
+import { Redirect } from 'react-router-dom';
 import IPFS from 'ipfs';
 
 class Home extends Component {
-  constructor() {
-    super();
-    this._node = null;
-  }
-
   get node() {
     return this._node;
   }

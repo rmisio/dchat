@@ -21,7 +21,7 @@ class Register extends Component {
             <a onClick={() => this.props.onRegenerate()}>Re-generate</a>
           </div>
           <div className="flexHRight">
-            <Link to="/">⬅️Back</Link>
+            <Link to="/login/">⬅️Back</Link>
           </div>
         </div>
       </div>
