@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { BrowserRouter as Router, Route, NavLink, withRouter } from 'react-router-dom';
+import { BrowserRouter as Route } from 'react-router-dom';
 import { generatePeerID } from '../util/crypto';
 import './App.scss';
 import SiteNav from './SiteNav';
@@ -11,6 +11,11 @@ class App extends Component {
     super(props);
     this.state = { registerSeed: '' };
     this.handleLogin = this.handleLogin.bind(this);
+    console.dir(props);
+  }
+
+  componentDidUpdate(prevProps) {
+    console.dir(this.props);
   }
 
   handleLogin(seed) {
@@ -28,34 +33,26 @@ class App extends Component {
   }
 
   render() {
-    let MainContent = props =>
-      <div className="mainContent">
-        <div>
-          {JSON.stringify(props)}
-        </div>      
-        <Route
-          path="/"
-          exact
-          render={
-            props => <Login onLogin={this.handleLogin} />
-          } />
-        <Route path="/register/"
-          render={
-            props => <Register seed={this.state.registerSeed} />
-          } />
-        { /*
-        <Route path="/users/" component={Users} />
-        */ }
-      </div>
-    MainContent = withRouter(MainContent);
-
     return (
-      <Router>
-        <div className="App">
-          <SiteNav />
-          <MainContent />
+      <div className="App">
+        <SiteNav />
+        <div className="mainContent">
+          <Route
+            path="/"
+            exact
+            render={
+              props => <Login onLogin={this.handleLogin} />
+            } />
+          <Route path="/register/"
+            exact
+            render={
+              props => <Register seed={this.state.registerSeed} />
+            } />
+          { /*
+          <Route path="/users/" component={Users} />
+          */ }
         </div>
-      </Router>
+      </div>
     );
   }
 }
