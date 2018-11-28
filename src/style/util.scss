@@ -1,9 +1,15 @@
+@import './mixins.scss';
+
 .txCtr {
   text-align: center;
 }
 
 .txRt {
   text-align: right;
+}
+
+.center {
+  @include center();
 }
 
 .width100 {

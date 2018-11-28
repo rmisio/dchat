@@ -18,7 +18,7 @@ export function generatePeerID(mnemonic) {
         (err, key) => {
           resolve({
             mnemonic,
-            'peerId': key._idB58String,
+            peerId: key._idB58String,
           });
         });
     });     

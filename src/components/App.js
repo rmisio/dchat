@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { BrowserRouter as Route } from 'react-router-dom';
+import { BrowserRouter as Router, Route } from 'react-router-dom';
 import { generatePeerID } from '../util/crypto';
 import './App.scss';
 import SiteNav from './SiteNav';
@@ -9,13 +9,15 @@ import Register from './Register';
 class App extends Component {
   constructor(props) {
     super(props);
-    this.state = { registerSeed: '' };
-    this.handleLogin = this.handleLogin.bind(this);
-    console.dir(props);
-  }
+    this.state = {
+      registerSeed: null,
+      registerSeedError: null,
+    };
 
-  componentDidUpdate(prevProps) {
-    console.dir(this.props);
+    this.handleLogin = this.handleLogin.bind(this);
+    this.handleRegenerate = this.handleRegenerate.bind(this);
+
+    this.generateRegisterSeed();
   }
 
   handleLogin(seed) {
@@ -32,27 +34,52 @@ class App extends Component {
       });
   }
 
+  handleRegenerate() {
+    this.generateRegisterSeed();
+  }
+
+  generateRegisterSeed() {
+    generatePeerID()
+      .then(
+        data => this.setState({
+          registerSeed: data.mnemonic,
+          registerSeedError: null,
+        }),
+        err => {
+          this.setState({
+            registerSeed: null,
+            registerSeedError: err,
+          });
+          console.error('There was an error gnerating the register seed.', err);
+        }
+      );
+  }
+
   render() {
     return (
-      <div className="App">
-        <SiteNav />
-        <div className="mainContent">
-          <Route
-            path="/"
-            exact
-            render={
-              props => <Login onLogin={this.handleLogin} />
-            } />
-          <Route path="/register/"
-            exact
-            render={
-              props => <Register seed={this.state.registerSeed} />
-            } />
-          { /*
-          <Route path="/users/" component={Users} />
-          */ }
+      <Router>
+        <div className="App">
+          <SiteNav />
+          <div className="mainContent">
+            <Route
+              path="/"
+              exact
+              render={
+                props => <Login onLogin={this.handleLogin} />
+              } />
+            <Route path="/register/"
+              exact
+              render={
+                props => <Register
+                  seed={this.state.registerSeed}
+                  onRegenerate={this.handleRegenerate} />
+              } />
+            { /*
+            <Route path="/users/" component={Users} />
+            */ }
+          </div>
         </div>
-      </div>
+      </Router>
     );
   }
 }

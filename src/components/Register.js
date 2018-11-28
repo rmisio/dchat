@@ -9,14 +9,17 @@ class Register extends Component {
     let seed = this.props.seed;
 
     if (!seed) {
-      seed = 'Generating…';
+      seed = <div className="center">Generating…</div>;
     }
 
     return (
       <div className="Register">
         <h1 className="rowLg txRt">You do now!</h1>
         <div className="border seed rowMd">{seed}</div>
-        <div className="flex">
+        <div className="flexVCent">
+          <div className="flexNoShrink">
+            <a onClick={() => this.props.onRegenerate()}>Re-generate</a>
+          </div>
           <div className="flexHRight">
             <Link to="/">⬅️Back</Link>
           </div>
