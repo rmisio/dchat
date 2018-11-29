@@ -7,6 +7,9 @@ import './Login.scss';
 class Login extends Component {
   constructor(props) {
     super(props);
+    this.state = {
+      seed: '',
+    };
     this.handleInputChange = this.handleInputChange.bind(this);
   }
 
