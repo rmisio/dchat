@@ -235,7 +235,6 @@ class App extends Component {
     });
 
     const updateAfterSend = (failed=false) => {
-      console.log(`lets update with ${failed}`);
       this.setState({
         chats: {
           ...this.state.chats,

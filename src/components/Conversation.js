@@ -37,6 +37,30 @@ class Conversation extends Component {
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
+  componentWillReceiveProps(nextProps) {
+    const messagesEl = this.messagesRef.current;
+
+    if (
+      this.props.messages[this.props.messages.length - 1].id !==
+        nextProps.messages[nextProps.messages.length - 1].id &&
+      messagesEl.scrollTop >= messagesEl.scrollHeight - messagesEl.offsetHeight - 15
+    ) {
+      // if we're scrolled at or very near the bottom and a new message comes
+      // in, we'll scroll down to the end.
+      this.scrollTo = messagesEl.scrollHeight;
+    }
+  }
+
+  componentDidUpdate() {
+    const messagesEl = this.messagesRef.current;
+    
+    if (typeof this.scrollTo === 'number') {
+      messagesEl.scrollTop = this.scrollTo;
+    }
+
+    this.scrollTo = null;
+  }
+
   render() {
     const failedInfoMsg =
       'The most likely reason in the person you are chatting with is offline. This app ' +
