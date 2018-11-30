@@ -5,6 +5,7 @@ import {
   withRouter,
 } from 'react-router-dom';
 import uuid4 from 'uuid/v4';
+import crypto from 'crypto';
 import protobuf from 'protobufjs';
 import IPFS from 'ipfs';
 import { createFromBytes } from 'peer-id'
@@ -34,22 +35,28 @@ class App extends Component {
     };
 
     this.state.chats = {
-      'QmSizzle': {
+      'QmVjLM8ieNfQfXGoA3E616qnQVziDk1J1Sbz2PCkFeGAay': {
         messages: [
           {
             id: uuid4(),
             outgoing: true,
-            msg: 'Hey there slick willy!',
+            msg: 'You feelin the funk or what?',
+            sending: false,
+            failed: false,
           },
           {
             id: uuid4(),
             outgoing: true,
-            msg: 'You feelin the funk or what?',
-          },
+            msg: 'Hey!',
+            sending: false,
+            failed: false,
+          },          
           {
             id: uuid4(),
             outgoing: false,
             msg: 'No doubt trey bingo. Why dont you try it on the west end so you could see if you could consolidate the peach trea with the left-over minutia? Eh!',
+            sending: false,
+            failed: false,
           },          
         ],
         isTyping: false,
@@ -90,7 +97,7 @@ class App extends Component {
   }
 
   get ipfsRelayPeer() {
-    return '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmVc37Xishzc8R3ZXn1p4Mm27nkSWhGSVdRr9Zi3NPRq8V';
+    return '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
   }
 
   handleLogin(seed) {
@@ -111,14 +118,18 @@ class App extends Component {
           node.libp2p.start((...args) => {
             this.node = node;
             this.setState({ userId: peerId });
+            
+            console.log(`connecting to the relay peer at ${this.ipfsRelayPeer}`);
             node.swarm.connect(this.ipfsRelayPeer, err => {
-              if (err) {
-                return console.error(err)
-              }
+              if (err) throw err;
+
+              console.log('connected to relay peer');
             });
 
             // handle incoming messages
             node._libp2pNode.handle('dabears/1', (protocol, conn) => {
+              console.log('pulling in incoming message');
+
               pull(
                 conn,
                 pull.collect((...args) => {
@@ -127,7 +138,7 @@ class App extends Component {
                   console.log('received echo:', data.toString());
                 }),
               );
-            });            
+            });
           });
         });
       })
@@ -203,65 +214,87 @@ class App extends Component {
 
     if (!chatState) return;
 
+    const msgId = uuid4();
+
     this.setState({
       chats: {
         ...this.state.chats,
         [peerId]: {
           ...chatState,
-          isSendingMsg: true,
+          messages: [
+            ...chatState.messages,
+            {
+              id: msgId,
+              outgoing: true,
+              msg,
+              sending: true,              
+            }
+          ]
         }
       },
     });
 
-    const updateSendAfter = () => {
+    const updateAfterSend = (failed=false) => {
+      console.log(`lets update with ${failed}`);
       this.setState({
         chats: {
           ...this.state.chats,
           [peerId]: {
-            ...chatState,
-            isSendingMsg: false,
-            messages: [
-              ...this.state.chats[peerId].messages,
-              {
-                id: uuid4(),
-                outgoing: true,
-                msg,
-              },
-            ],
+            ...this.state.chats[peerId],
+            messages: this.state.chats[peerId].messages.map(msg => {
+              if (msg.id === msgId) {
+                return {
+                  ...msg,
+                  failed,
+                  sending: false,
+                }
+              } else {
+                return msg;
+              }
+            }),
           }
         },
       });      
     }
 
     const peer = `/p2p-circuit/ipfs/${peerId}`;
-    console.log(`will send to ${peerId}`);
+    console.log(`will send to ${peerId} at ${peer}`);
 
-    try {
-      this.node.swarm.connect(peer, err => {
-        if (err) { throw err }
+    this.node.swarm.connect(peer, err => {
+      if (err) { 
+        updateAfterSend(true);
+        return console.error(err);
+      }
 
-        console.log(`connected to ${peerId}`);
+      console.log(`connected to ${peerId}`);
 
-        this.node._libp2pNode.dialProtocol(peer, 'dabears/1', (err, conn) => {
-          if (err) { throw err }
+      this.node._libp2pNode.dialProtocol(peer, 'dabears/1', (err, conn) => {
+        if (err) { 
+          updateAfterSend(true);
+          return console.error(err);
+        }
 
-          const payload = this.getChatPayload(msg);
-          const Chat = this.ChatPB;
-          const chat = Chat.create(payload);
-          const serializedChat = Chat.encode(chat).finish();
+        const payload = this.getChatPayload(msg);
+        const Chat = this.ChatPB;
+        const chat = Chat.create(payload);
+        const serializedChat = Chat.encode(chat).finish();
 
-          pull(
-            pull.once(serializedChat),
-            conn,
-          );
-          updateSendAfter();
-        });
+        console.log('pushing outgoing message');
+
+        pull(
+          pull.once(serializedChat),
+          conn,
+          pull.collect((err, data) => {
+            if (err) { 
+              updateAfterSend(true);
+              return console.error(err);
+            }
+            console.log('received echo:', data.toString())
+            updateAfterSend();
+          }),            
+        );
       });
-    } catch (e) {
-      alert(`Unable to send the chat message: ${e.message}`);
-      updateSendAfter();
-      throw e;
-    }
+    });
   }
 
   generateRegisterSeed() {
@@ -301,7 +334,6 @@ class App extends Component {
   get defaultChat() {
     return {
       isTyping: false,
-      isSendingMsg: false,
       messages: [],
     };
   }
