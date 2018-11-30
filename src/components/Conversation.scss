@@ -31,21 +31,30 @@
         clear: both;
         position: relative;
 
-        &::after {
+        &::before {
           content: ' ⬅️Them';
           font-weight: bold;
+          float: right;
+          clear: both;
+          width: 100%;
+          text-align: right;
+          margin-bottom: 5px;
         }
 
         &.outgoing {
           float: left;
 
-          &::after {
-            display: none;
-          }
-
           &::before {
             content: 'You ➡️ ';
             font-weight: bold;
+            float: left;
+            text-align: left;
+          }
+
+          &::before {
+            // content: 'You ➡️ ';
+            // font-weight: bold;
+            // float: left;
           }
         }
 

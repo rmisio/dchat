@@ -34,34 +34,34 @@ class App extends Component {
       chats: {},
     };
 
-    this.state.chats = {
-      'QmVjLM8ieNfQfXGoA3E616qnQVziDk1J1Sbz2PCkFeGAay': {
-        messages: [
-          {
-            id: uuid4(),
-            outgoing: true,
-            msg: 'You feelin the funk or what?',
-            sending: false,
-            failed: false,
-          },
-          {
-            id: uuid4(),
-            outgoing: true,
-            msg: 'Hey!',
-            sending: false,
-            failed: false,
-          },          
-          {
-            id: uuid4(),
-            outgoing: false,
-            msg: 'No doubt trey bingo. Why dont you try it on the west end so you could see if you could consolidate the peach trea with the left-over minutia? Eh!',
-            sending: false,
-            failed: false,
-          },          
-        ],
-        isTyping: false,
-      },
-    }
+    // this.state.chats = {
+    //   'QmVjLM8ieNfQfXGoA3E616qnQVziDk1J1Sbz2PCkFeGAay': {
+    //     messages: [
+    //       {
+    //         id: uuid4(),
+    //         outgoing: true,
+    //         msg: 'You feelin the funk or what?',
+    //         sending: false,
+    //         failed: false,
+    //       },
+    //       {
+    //         id: uuid4(),
+    //         outgoing: true,
+    //         msg: 'Hey!',
+    //         sending: false,
+    //         failed: false,
+    //       },          
+    //       {
+    //         id: uuid4(),
+    //         outgoing: false,
+    //         msg: 'No doubt trey bingo. Why dont you try it on the west end so you could see if you could consolidate the peach trea with the left-over minutia? Eh!',
+    //         sending: false,
+    //         failed: false,
+    //       },
+    //     ],
+    //     isTyping: false,
+    //   },
+    // }
 
     this.handleLogin = this.handleLogin.bind(this);
     this.handleRegenerate = this.handleRegenerate.bind(this);
@@ -132,10 +132,49 @@ class App extends Component {
 
               pull(
                 conn,
-                pull.collect((...args) => {
-                  const [err, data] = args;
-                  if (err) { throw err };
-                  console.log('received echo:', data.toString());
+                pull.collect((err, data) => {
+                  if (err) {
+                    return console.error('There was an error pulling in an incoming chat ' +
+                      'message:', err);
+                  }
+
+                  // try {
+                  //   const decodedChatMsg = this.ChatPB.decode(data[0]);
+                  //   console.dir(decodedChatMsg);
+                  // } catch (e) {
+                  //   console.error('There was an error decoding the incoming message:', err);
+                  // }
+
+                  const msg = JSON.parse(data[0]);
+                  console.dir(msg);
+                  const curChatState = this.state.chats[msg.peerId] || this.defaultChat;
+
+                  const chatState = {
+                    ...curChatState,
+                    messages: [
+                      ...curChatState.messages,
+                      {
+                        id: msg.messageId,
+                        outgoing: false,
+                        msg: msg.message,
+                        sending: false,
+                        failed: false,
+                      },
+                    ],
+                  }
+
+                  this.setState({
+                    chats: {
+                      ...this.state.chats,
+                      [msg.peerId]: chatState,
+                    }
+                  });
+                  console.dir({
+                    chats: {
+                      ...this.state.chats,
+                      [msg.peerId]: chatState,
+                    }
+                  });
                 }),
               );
             });
@@ -215,6 +254,7 @@ class App extends Component {
     if (!chatState) return;
 
     const msgId = uuid4();
+    const peerIdFrom = this.state.userId;
 
     this.setState({
       chats: {
@@ -274,24 +314,30 @@ class App extends Component {
         }
 
         const payload = this.getChatPayload(msg);
-        const Chat = this.ChatPB;
-        const chat = Chat.create(payload);
-        const serializedChat = Chat.encode(chat).finish();
+        // const Chat = this.ChatPB;
+        // const chat = Chat.create(payload);
+        // const serializedChat = Chat.encode(chat).finish();
+        const serializedChat = JSON.stringify({
+          ...payload,
+          peerId: peerIdFrom,
+        });
 
         console.log('pushing outgoing message');
-
+        
         pull(
           pull.once(serializedChat),
           conn,
           pull.collect((err, data) => {
             if (err) { 
-              updateAfterSend(true);
+              // updateAfterSend(true);
               return console.error(err);
             }
             console.log('received echo:', data.toString())
-            updateAfterSend();
+            // updateAfterSend();
           }),            
         );
+
+        updateAfterSend();
       });
     });
   }
@@ -339,11 +385,12 @@ class App extends Component {
 
   render() {
     const indexRedirectPath = this.isLoggedIn ?
-      '/start-convo/' : '/login/';
+      '/start-chat/' : '/login/';
+    const chats = this.state.chats;
 
     return (
       <div className="App">
-        <SiteNav />
+        <SiteNav chats={Object.keys(chats)} />
         <div className="mainContent">
           <Route
             path="/"
@@ -354,7 +401,7 @@ class App extends Component {
             exact
             render={
               () => this.isLoggedIn ?
-                <Redirect to="/start-convo/" /> :
+                <Redirect to="/start-chat/" /> :
                 <Login onLogin={this.handleLogin} />
             } />
           <Route path="/register/"
@@ -365,7 +412,7 @@ class App extends Component {
                 onRegenerate={this.handleRegenerate} />
             } />
           <Route
-            path="/start-convo/"
+            path="/start-chat/"
             exact
             render={this.requiresLogin(StartConvo,
               { onStartChat: this.handleStartChat })} />

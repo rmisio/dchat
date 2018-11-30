@@ -39,10 +39,12 @@ class Conversation extends Component {
 
   componentWillReceiveProps(nextProps) {
     const messagesEl = this.messagesRef.current;
+    const curLastMessage = this.props.messages[this.props.messages.length - 1];
+    const nextLastMessage = nextProps.messages[nextProps.messages.length - 1];
 
     if (
-      this.props.messages[this.props.messages.length - 1].id !==
-        nextProps.messages[nextProps.messages.length - 1].id &&
+      nextLastMessage &&
+      (!curLastMessage || curLastMessage.id !== nextLastMessage.id) &&
       messagesEl.scrollTop >= messagesEl.scrollHeight - messagesEl.offsetHeight - 15
     ) {
       // if we're scrolled at or very near the bottom and a new message comes
@@ -53,7 +55,7 @@ class Conversation extends Component {
 
   componentDidUpdate() {
     const messagesEl = this.messagesRef.current;
-    
+
     if (typeof this.scrollTo === 'number') {
       messagesEl.scrollTop = this.scrollTo;
     }
