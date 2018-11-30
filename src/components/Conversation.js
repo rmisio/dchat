@@ -4,10 +4,13 @@ import './Conversation.scss';
 class Conversation extends Component {
   constructor(props) {
     super(props);
+    
     this.state = {
       chatText: '',
     };
+    
     this.handleInputChange = this.handleInputChange.bind(this);
+    this.handleChatTextKeyUp = this.handleChatTextKeyUp.bind(this);
 
     this.messagesRef = React.createRef();
   }
@@ -20,6 +23,13 @@ class Conversation extends Component {
     this.setState({
       [name]: value
     });
+  }
+
+  handleChatTextKeyUp(e) {
+    if (e.keyCode === 13) {
+      this.setState({ chatText: '' });
+      this.props.onChatSend(this.props.receiver, this.state.chatText);
+    }
   }
 
   componentDidMount() {
@@ -37,7 +47,7 @@ class Conversation extends Component {
     const failedInfo =
       this.props.messages.find(msg => msg.failed) ?
         (
-          <div class="failedInfo">
+          <div className="failedInfo">
             <a onClick={() => alert(failedInfoMsg)}>Why have some of my messages failed?</a>
           </div>
         ) : null;
@@ -78,7 +88,8 @@ class Conversation extends Component {
                 placeholder="Say something clever..."
                 name="chatText"
                 value={this.state.chatText}
-                onChange={this.handleInputChange} />
+                onChange={this.handleInputChange}
+                onKeyUp={this.handleChatTextKeyUp} />
             </div>
             <div>
               <div className="flexHRight">
