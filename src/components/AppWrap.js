@@ -5,7 +5,7 @@ import App from './App';
 class AppWrap extends Component {
   render() {
     return (
-      <Router><App /></Router>
+      <Router basename="/dchat"><App /></Router>
     );
   }
 }
