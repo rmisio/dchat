@@ -122,7 +122,11 @@ class App extends Component {
             
             console.log(`connecting to the relay peer at ${this.ipfsRelayPeer}`);
             node.swarm.connect(this.ipfsRelayPeer, err => {
-              if (err) throw err;
+              if (err) {
+                alert('Unable to connect to the relay peer. Are you sure it\'s ' +
+                  ' running?');
+                return console.error(err);
+              }
 
               console.log('connected to relay peer');
             });
