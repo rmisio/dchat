@@ -1,7 +1,7 @@
 {
   "main.css": "/dchat/static/css/main.e7a6775c.chunk.css",
-  "main.js": "/dchat/static/js/main.697c36ad.chunk.js",
-  "main.js.map": "/dchat/static/js/main.697c36ad.chunk.js.map",
+  "main.js": "/dchat/static/js/main.15bd369d.chunk.js",
+  "main.js.map": "/dchat/static/js/main.15bd369d.chunk.js.map",
   "static/css/1.c3a5cde0.chunk.css": "/dchat/static/css/1.c3a5cde0.chunk.css",
   "static/js/1.cbec51df.chunk.js": "/dchat/static/js/1.cbec51df.chunk.js",
   "static/js/1.cbec51df.chunk.js.map": "/dchat/static/js/1.cbec51df.chunk.js.map",
@@ -10,6 +10,6 @@
   "static/css/1.c3a5cde0.chunk.css.map": "/dchat/static/css/1.c3a5cde0.chunk.css.map",
   "static/css/main.e7a6775c.chunk.css.map": "/dchat/static/css/main.e7a6775c.chunk.css.map",
   "index.html": "/dchat/index.html",
-  "precache-manifest.fca92a5f639f8935b53a7f0281ff41fb.js": "/dchat/precache-manifest.fca92a5f639f8935b53a7f0281ff41fb.js",
+  "precache-manifest.acf7b80d119ac55584f5063f975eeda3.js": "/dchat/precache-manifest.acf7b80d119ac55584f5063f975eeda3.js",
   "service-worker.js": "/dchat/service-worker.js"
 }
