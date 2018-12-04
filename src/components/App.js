@@ -172,7 +172,7 @@ class App extends Component {
                   const chatState = {
                     ...curChatState,
                     unread: this.props.location.pathname
-                      .startsWith(`/chat/${msg.peerId}`) ?
+                      .startsWith(`/chat/${msg.peerId}`) && document.hasFocus() ?
                         0 : curUnreadCount + 1,
                     messages: [
                       ...curChatState.messages,
@@ -354,11 +354,9 @@ class App extends Component {
               conn,
               pull.collect((err, data) => {
                 if (err) { 
-                  // updateAfterSend(true);
                   return console.error(err);
                 }
                 console.log('received echo:', data.toString())
-                // updateAfterSend();
               }),            
             );
 
