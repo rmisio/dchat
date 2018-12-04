@@ -98,8 +98,29 @@ class App extends Component {
 
   get ipfsRelayPeer() {
     return '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
-    // // return '/ip4/127.0.0.1/tcp/4003/ws/ipfs/QmSykrDTzsUy7SMvKaZwg6gewrd2mFkbmqH5AWprAzy2HJ';
-    // return '/ip4/138.68.5.113/tcp/9005/wss/ipfs/QmPPg2qeF3n2KvTRXRZLaTwHCw8JxzF4uZK93RfMoDvf2o';
+  }
+
+  relayConnect() {
+    return new Promise((resolve, reject) => {
+      if (!this.node) {
+        reject(new Error('There is no active IPFS node.'));
+        return;
+      }
+
+      this.node.swarm.connect(this.ipfsRelayPeer, err => {
+        if (err) {
+          alert('Unable to connect to the relay peer. Are you sure it\'s ' +
+            'running?');
+          console.error(`Unable to connect to the relay peer at ${this.ipfsRelayPeer}.`);
+          console.error(err);
+          reject(err);
+          return;
+        }
+
+        console.log('connected to relay peer');
+        resolve();
+      });
+    });
   }
 
   handleLogin(seed) {
@@ -120,18 +141,11 @@ class App extends Component {
           node.libp2p.start((...args) => {
             this.node = node;
             this.setState({ userId: peerId });
+
+            this.relayConnect();
+
+            setInterval(() => this.relayConnect(), 1000 * 15);
             
-            console.log(`connecting to the relay peer at ${this.ipfsRelayPeer}`);
-            node.swarm.connect(this.ipfsRelayPeer, err => {
-              if (err) {
-                alert('Unable to connect to the relay peer. Are you sure it\'s ' +
-                  ' running?');
-                return console.error(err);
-              }
-
-              console.log('connected to relay peer');
-            });
-
             // handle incoming messages
             node._libp2pNode.handle('dabears/1', (protocol, conn) => {
               console.log('pulling in incoming message');
@@ -305,47 +319,51 @@ class App extends Component {
     const peer = `/p2p-circuit/ipfs/${peerId}`;
     console.log(`will send to ${peerId} at ${peer}`);
 
-    this.node.swarm.connect(peer, err => {
-      if (err) { 
-        updateAfterSend(true);
-        return console.error(err);
-      }
+    this.relayConnect()
+      .then(() => {
+        this.node.swarm.connect(peer, err => {
+          if (err) { 
+            updateAfterSend(true);
+            return console.error(err);
+          }
 
-      console.log(`connected to ${peerId}`);
+          console.log(`connected to ${peerId}`);
 
-      this.node._libp2pNode.dialProtocol(peer, 'dabears/1', (err, conn) => {
-        if (err) { 
-          updateAfterSend(true);
-          return console.error(err);
-        }
-
-        const payload = this.getChatPayload(msg);
-        // const Chat = this.ChatPB;
-        // const chat = Chat.create(payload);
-        // const serializedChat = Chat.encode(chat).finish();
-        const serializedChat = JSON.stringify({
-          ...payload,
-          peerId: peerIdFrom,
-        });
-
-        console.log('pushing outgoing message');
-        
-        pull(
-          pull.once(serializedChat),
-          conn,
-          pull.collect((err, data) => {
+          this.node._libp2pNode.dialProtocol(peer, 'dabears/1', (err, conn) => {
             if (err) { 
-              // updateAfterSend(true);
+              updateAfterSend(true);
               return console.error(err);
             }
-            console.log('received echo:', data.toString())
-            // updateAfterSend();
-          }),            
-        );
 
-        updateAfterSend();
-      });
-    });
+            const payload = this.getChatPayload(msg);
+            // const Chat = this.ChatPB;
+            // const chat = Chat.create(payload);
+            // const serializedChat = Chat.encode(chat).finish();
+            const serializedChat = JSON.stringify({
+              ...payload,
+              peerId: peerIdFrom,
+            });
+
+            console.log('pushing outgoing message');
+            
+            pull(
+              pull.once(serializedChat),
+              conn,
+              pull.collect((err, data) => {
+                if (err) { 
+                  // updateAfterSend(true);
+                  return console.error(err);
+                }
+                console.log('received echo:', data.toString())
+                // updateAfterSend();
+              }),            
+            );
+
+            updateAfterSend();
+          });
+        });
+      })
+      .catch(e => updateAfterSend());
   }
 
   generateRegisterSeed() {
