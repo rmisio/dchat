@@ -4,15 +4,15 @@ self.__precacheManifest = [
     "url": "/dchat/static/js/runtime~main.75ac50d5.js"
   },
   {
-    "revision": "15bd369de8309ff8cfaa",
-    "url": "/dchat/static/js/main.15bd369d.chunk.js"
+    "revision": "6ad9717047d437362059",
+    "url": "/dchat/static/js/main.6ad97170.chunk.js"
   },
   {
     "revision": "cbec51df32002f4db9f5",
     "url": "/dchat/static/js/1.cbec51df.chunk.js"
   },
   {
-    "revision": "15bd369de8309ff8cfaa",
+    "revision": "6ad9717047d437362059",
     "url": "/dchat/static/css/main.e7a6775c.chunk.css"
   },
   {
@@ -20,7 +20,7 @@ self.__precacheManifest = [
     "url": "/dchat/static/css/1.c3a5cde0.chunk.css"
   },
   {
-    "revision": "00f6580598f0395648d04ecea4da5cbc",
+    "revision": "56ec11f13d17b3f34fbb16f3938b97c1",
     "url": "/dchat/index.html"
   }
 ];
