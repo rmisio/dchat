@@ -97,7 +97,8 @@ class App extends Component {
   }
 
   get ipfsRelayPeer() {
-    return '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
+    // return '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
+    return '/ip4/127.0.0.1/tcp/4003/ws/ipfs/QmSykrDTzsUy7SMvKaZwg6gewrd2mFkbmqH5AWprAzy2HJ';
   }
 
   handleLogin(seed) {
