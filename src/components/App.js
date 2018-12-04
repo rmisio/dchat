@@ -97,9 +97,9 @@ class App extends Component {
   }
 
   get ipfsRelayPeer() {
-    // return '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
-    // return '/ip4/127.0.0.1/tcp/4003/ws/ipfs/QmSykrDTzsUy7SMvKaZwg6gewrd2mFkbmqH5AWprAzy2HJ';
-    return '/ip4/138.68.5.113/tcp/9005/ws/ipfs/QmPPg2qeF3n2KvTRXRZLaTwHCw8JxzF4uZK93RfMoDvf2o';
+    return '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
+    // // return '/ip4/127.0.0.1/tcp/4003/ws/ipfs/QmSykrDTzsUy7SMvKaZwg6gewrd2mFkbmqH5AWprAzy2HJ';
+    // return '/ip4/138.68.5.113/tcp/9005/wss/ipfs/QmPPg2qeF3n2KvTRXRZLaTwHCw8JxzF4uZK93RfMoDvf2o';
   }
 
   handleLogin(seed) {

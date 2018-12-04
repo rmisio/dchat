@@ -2,7 +2,6 @@
   "name": "dchat",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://rmisio.github.io/dchat/",
   "dependencies": {
     "base64-js": "^1.3.0",
     "bip39": "^2.5.0",
