@@ -33,4 +33,26 @@
       pointer-events: none;
     }
   }
+
+  .chatLink {
+    position: relative;
+
+    & [data-unread]::before {
+      content: attr(data-unread);
+      background-color: #be6837;
+      color: white;
+      border: 1px solid white;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      padding: 3px;
+      width: 13px;
+      height: 13px;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+    }
+  }  
 }

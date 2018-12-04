@@ -166,11 +166,14 @@ class App extends Component {
                   // }
 
                   const msg = JSON.parse(data[0]);
-                  console.dir(msg);
                   const curChatState = this.state.chats[msg.peerId] || this.defaultChat;
+                  const curUnreadCount = curChatState.unread || 0;
 
                   const chatState = {
                     ...curChatState,
+                    unread: this.props.location.pathname
+                      .startsWith(`/chat/${msg.peerId}`) ?
+                        0 : curUnreadCount + 1,
                     messages: [
                       ...curChatState.messages,
                       {
@@ -366,6 +369,21 @@ class App extends Component {
       .catch(e => updateAfterSend());
   }
 
+  handleConvoDidMount(receiver) {
+    const receiverChatState = this.state.chats[receiver];
+
+    if (receiverChatState) {
+      this.setState({
+        chats: {
+          [receiver]: {
+            ...receiverChatState,
+            unread: 0,
+          }
+        }
+      })
+    }
+  }
+
   generateRegisterSeed() {
     generatePeerId()
       .then(
@@ -411,10 +429,17 @@ class App extends Component {
     const indexRedirectPath = this.isLoggedIn ?
       '/start-chat/' : '/login/';
     const chats = this.state.chats;
+    const siteNavChats = Object.keys(chats)
+      .map(peerId => ({
+        peerId,
+        unread: chats[peerId].unread,
+      }));
+
+    console.dir(this.props);
 
     return (
       <div className="App">
-        <SiteNav chats={Object.keys(chats)} />
+        <SiteNav chats={siteNavChats} />
         <div className="mainContent">
           <Route
             path="/"
@@ -455,6 +480,7 @@ class App extends Component {
                   ...convoState,
                   receiver,
                   onChatSend: this.handleChatSend,
+                  componentDidMount: () => this.handleConvoDidMount(receiver),
                 })(props);
               }
             } />

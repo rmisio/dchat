@@ -35,6 +35,7 @@ class Conversation extends Component {
   componentDidMount() {
     const messagesEl = this.messagesRef.current;
     messagesEl.scrollTop = messagesEl.scrollHeight;
+    this.props.componentDidMount();
   }
 
   componentWillReceiveProps(nextProps) {
