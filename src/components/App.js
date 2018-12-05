@@ -116,7 +116,10 @@ class App extends Component {
         resolve(...args);
       };
 
-      reject();
+      if (!this.moo || this.moo < 3) {
+        this.moo = this.moo ? this.moo++ : 0;
+        reject();
+      }
 
       if (!this.node) {
         reject(new Error('There is no active IPFS node.'));
@@ -453,7 +456,7 @@ class App extends Component {
 
     return (
       <div className="App">
-        <SiteNav chats={siteNavChats} />
+        <SiteNav chats={siteNavChats} userId={this.state.userId} />
         <div className="mainContent">
           <Route
             path="/"
