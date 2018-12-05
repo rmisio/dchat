@@ -64,12 +64,17 @@ class App extends Component {
     // }
 
     this.handleWindowFocus = this.handleWindowFocus.bind(this);
+    this.handleWindowBlur = this.handleWindowBlur.bind(this);
     this.handleLogin = this.handleLogin.bind(this);
     this.handleRegenerate = this.handleRegenerate.bind(this);
     this.handleStartChat = this.handleStartChat.bind(this);
     this.handleChatSend = this.handleChatSend.bind(this);
 
     this.generateRegisterSeed();
+  }
+
+  get baseDocTitle() {
+    return 'dChat';
   }
 
   handleWindowFocus() {
@@ -79,15 +84,36 @@ class App extends Component {
       const split = window.location.pathname.split('/');
       const peerId = split[2];
       this.clearUnreadCount(peerId);
-    } 
+    }
+
+    // document.title = this.baseDocTitle;
+  }
+
+  handleWindowBlur() {
+    // this.updateTitleCount();
+  }
+
+  updateTitleCount() {
+    let totalUnreads = 0;
+
+    Object.keys(this.state.chats)
+      .forEach(chat => totalUnreads += this.state.chats[chat].unread || 0);
+
+    if (totalUnreads) {
+      document.title = `${this.baseDocTitle} - ${totalUnreads}`;
+    } else {
+      document.title = this.baseDocTitle;
+    }
   }
 
   componentDidMount() {
     window.addEventListener('focus', this.handleWindowFocus);
+    window.addEventListener('blur', this.handleWindowBlur);
   }
 
   componentWillUnmount() {
     window.removeEventListener('focus', this.handleWindowFocus);
+    window.removeEventListener('blur', this.handleWindowBlur);
   }
 
   componentDidUpdate(prevProps) {
@@ -111,7 +137,8 @@ class App extends Component {
             unread: 0,
           }
         }
-      })
+      },
+      () => this.updateTitleCount());
     }
   }
 
@@ -253,6 +280,10 @@ class App extends Component {
                       [msg.peerId]: chatState,
                     }
                   });
+
+                  if (!document.hasFocus()) {
+                    this.updateTitleCount();
+                  }
                 }),
               );
             });
