@@ -52,7 +52,7 @@ class SiteNav extends Component {
             )
           })
         }
-        <div class="flexExpand">{peerIdEl}</div>
+        <div className="flexExpand">{peerIdEl}</div>
       </nav>
     );
   }

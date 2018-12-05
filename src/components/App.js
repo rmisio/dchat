@@ -63,12 +63,42 @@ class App extends Component {
     //   },
     // }
 
+    this.handleWindowFocus = this.handleWindowFocus.bind(this);
     this.handleLogin = this.handleLogin.bind(this);
     this.handleRegenerate = this.handleRegenerate.bind(this);
     this.handleStartChat = this.handleStartChat.bind(this);
     this.handleChatSend = this.handleChatSend.bind(this);
 
     this.generateRegisterSeed();
+  }
+
+  handleWindowFocus() {
+    const url = new URL(window.location.href);
+
+    if (window.location.pathname.startsWith('/chat/')) {
+      const split = window.location.pathname.split('/');
+      const receiver = split[2];
+
+      if (receiver && this.state.chats[receiver]) {
+        this.setState({
+          chats: {
+            ...this.state.chats,
+            [receiver]: {
+              ...this.state.chats[receiver],
+              unread: 0,
+            }
+          }
+        })
+      }
+    } 
+  }
+
+  componentDidMount() {
+    window.addEventListener('focus', this.handleWindowFocus);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('focus', this.handleWindowFocus);
   }
 
   // need base58 peerId, base64 privateKey
@@ -451,8 +481,6 @@ class App extends Component {
         peerId,
         unread: chats[peerId].unread,
       }));
-
-    console.dir(this.props);
 
     return (
       <div className="App">
