@@ -77,19 +77,8 @@ class App extends Component {
 
     if (window.location.pathname.startsWith('/chat/')) {
       const split = window.location.pathname.split('/');
-      const receiver = split[2];
-
-      if (receiver && this.state.chats[receiver]) {
-        this.setState({
-          chats: {
-            ...this.state.chats,
-            [receiver]: {
-              ...this.state.chats[receiver],
-              unread: 0,
-            }
-          }
-        })
-      }
+      const peerId = split[2];
+      this.clearUnreadCount(peerId);
     } 
   }
 
@@ -99,6 +88,31 @@ class App extends Component {
 
   componentWillUnmount() {
     window.removeEventListener('focus', this.handleWindowFocus);
+  }
+
+  componentDidUpdate(prevProps) {
+    if (
+      prevProps.location.pathname !== this.props.location.pathname &&
+      this.props.location.pathname.startsWith('/chat/')
+    ) {
+      const split = this.props.location.pathname.split('/');
+      const peerId = split[2];
+      this.clearUnreadCount(peerId);
+    }
+  }
+
+  clearUnreadCount(peerId) {
+    if (peerId && this.state.chats[peerId]) {
+      this.setState({
+        chats: {
+          ...this.state.chats,
+          [peerId]: {
+            ...this.state.chats[peerId],
+            unread: 0,
+          }
+        }
+      })
+    }
   }
 
   // need base58 peerId, base64 privateKey
@@ -190,8 +204,6 @@ class App extends Component {
           node.libp2p.start((...args) => {
             this.node = node;
             this.setState({ userId: peerId });
-            console.log('the node is node');
-            window.node = node;
 
             this.relayConnect();
             
@@ -236,12 +248,6 @@ class App extends Component {
                   }
 
                   this.setState({
-                    chats: {
-                      ...this.state.chats,
-                      [msg.peerId]: chatState,
-                    }
-                  });
-                  console.dir({
                     chats: {
                       ...this.state.chats,
                       [msg.peerId]: chatState,
@@ -422,6 +428,7 @@ class App extends Component {
     if (receiverChatState) {
       this.setState({
         chats: {
+          ...this.state.chats,
           [receiver]: {
             ...receiverChatState,
             unread: 0,
