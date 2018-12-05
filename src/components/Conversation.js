@@ -66,10 +66,9 @@ class Conversation extends Component {
 
   render() {
     const failedInfoMsg =
-      'The most likely reason in the person you are chatting with is offline. This app ' +
-      'does not support offline messages at this time. If you are sure the other party is ' +
-      'online, it\'s possible that both your ports are blocked and you are unable to connect ' +
-      'to the relay server.';
+      'The most likely reason in the person you are chatting with is offline. Offline messages ' +
+      'are not supported at this time. The other main reason would be that either you or the ' +
+      'receiver are not connected to the relay server.';
 
     const failedInfo =
       this.props.messages.find(msg => msg.failed) ?

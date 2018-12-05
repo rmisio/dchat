@@ -116,6 +116,8 @@ class App extends Component {
         resolve(...args);
       };
 
+      reject();
+
       if (!this.node) {
         reject(new Error('There is no active IPFS node.'));
         return;
@@ -152,14 +154,6 @@ class App extends Component {
         const node = new IPFS(ipfsInitOpts);
 
         node.on('ready', () => {
-          node._libp2pNode.on('peer:disconnect', (peer) => {
-            console.log(`some joker ${peer} things he could just go AWOL.`);
-          });
-
-          node._libp2pNode.on('peer:connect', (peer) => {
-            console.log(`welcome to the party pal: ${peer}`);
-          });
-
           node.libp2p.start((...args) => {
             this.node = node;
             this.setState({ userId: peerId });
