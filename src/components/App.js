@@ -101,13 +101,27 @@ class App extends Component {
   }
 
   relayConnect() {
-    return new Promise((resolve, reject) => {
+    if (this._relayConnectPromise) {
+      return this._relayConnectPromise;
+    }
+
+    return new Promise((res, rej) => {
+      const always = () => this._relayConnectPromise = null;
+      const resolve = (...args) => {
+        always();
+        res(...args);
+      };
+      const reject = (...args) => {
+        always();
+        resolve(...args);
+      };
+
       if (!this.node) {
         reject(new Error('There is no active IPFS node.'));
         return;
       }
 
-      this.node.swarm.connect(this.ipfsRelayPeer, err => {
+      this.node._libp2pNode.dialFSM(this.ipfsRelayPeer, 'dabears/1', (err, connFSM) => {
         if (err) {
           alert('Unable to connect to the relay peer. Are you sure it\'s ' +
             'running?');
@@ -117,7 +131,7 @@ class App extends Component {
           return;
         }
 
-        console.log('connected to relay peer');
+        connFSM.on('close', () => this.relayConnect());
         resolve();
       });
     });
@@ -138,13 +152,21 @@ class App extends Component {
         const node = new IPFS(ipfsInitOpts);
 
         node.on('ready', () => {
+          node._libp2pNode.on('peer:disconnect', (peer) => {
+            console.log(`some joker ${peer} things he could just go AWOL.`);
+          });
+
+          node._libp2pNode.on('peer:connect', (peer) => {
+            console.log(`welcome to the party pal: ${peer}`);
+          });
+
           node.libp2p.start((...args) => {
             this.node = node;
             this.setState({ userId: peerId });
+            console.log('the node is node');
+            window.node = node;
 
             this.relayConnect();
-
-            setInterval(() => this.relayConnect(), 1000 * 15);
             
             // handle incoming messages
             node._libp2pNode.handle('dabears/1', (protocol, conn) => {
