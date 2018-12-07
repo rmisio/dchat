@@ -16,7 +16,11 @@ import {
   generatePeerId,
   identityKeyFromSeed,
 } from '../util/crypto';
-import jsonDescriptor from './message.json';
+import {
+  generateChatMessage,
+  openMessage,
+} from '../util/messaging';
+import jsonDescriptor from '../message.json';
 import './App.scss';
 import SiteNav from './SiteNav';
 import Login from './Login';
@@ -64,7 +68,6 @@ class App extends Component {
     // }
 
     this.handleWindowFocus = this.handleWindowFocus.bind(this);
-    this.handleWindowBlur = this.handleWindowBlur.bind(this);
     this.handleLogin = this.handleLogin.bind(this);
     this.handleRegenerate = this.handleRegenerate.bind(this);
     this.handleStartChat = this.handleStartChat.bind(this);
@@ -85,12 +88,6 @@ class App extends Component {
       const peerId = split[2];
       this.clearUnreadCount(peerId);
     }
-
-    // document.title = this.baseDocTitle;
-  }
-
-  handleWindowBlur() {
-    // this.updateTitleCount();
   }
 
   updateTitleCount() {
@@ -108,12 +105,10 @@ class App extends Component {
 
   componentDidMount() {
     window.addEventListener('focus', this.handleWindowFocus);
-    window.addEventListener('blur', this.handleWindowBlur);
   }
 
   componentWillUnmount() {
     window.removeEventListener('focus', this.handleWindowFocus);
-    window.removeEventListener('blur', this.handleWindowBlur);
   }
 
   componentDidUpdate(prevProps) {
@@ -197,7 +192,7 @@ class App extends Component {
         return;
       }
 
-      this.node._libp2pNode.dialFSM(this.ipfsRelayPeer, 'dabears/1', (err, connFSM) => {
+      this.node._libp2pNode.dialFSM(this.ipfsRelayPeer, '/openbazaar/app/1.0.0', (err, connFSM) => {
         if (err) {
           alert('Unable to connect to the relay peer. Are you sure it\'s ' +
             'running?');
@@ -207,6 +202,7 @@ class App extends Component {
           return;
         }
 
+        console.log('connected to the relay');
         connFSM.on('close', () => this.relayConnect());
         resolve();
       });
@@ -220,9 +216,9 @@ class App extends Component {
 
     // todo: need some isLoggingIn state.
     identityKeyFromSeed(seed)
-      .then(data => {
-        const peerId = createFromBytes(data.peerId).toB58String();
-        const privateKey = fromByteArray(data.privateKey);
+      .then(identity => {
+        const peerId = createFromBytes(identity.peerId).toB58String();
+        const privateKey = fromByteArray(identity.privateKey);
         console.log(`A seed of "${seed.slice(0, 25)}…" gets you this peerId: ${peerId}`);
         const ipfsInitOpts = this.getIpfsNodeInitOpts(peerId, privateKey)
         const node = new IPFS(ipfsInitOpts);
@@ -230,12 +226,13 @@ class App extends Component {
         node.on('ready', () => {
           node.libp2p.start((...args) => {
             this.node = node;
+            this.identity = identity;
             this.setState({ userId: peerId });
 
             this.relayConnect();
             
             // handle incoming messages
-            node._libp2pNode.handle('dabears/1', (protocol, conn) => {
+            node._libp2pNode.handle('/openbazaar/app/1.0.0', (protocol, conn) => {
               console.log('pulling in incoming message');
 
               pull(
@@ -253,8 +250,25 @@ class App extends Component {
                   //   console.error('There was an error decoding the incoming message:', err);
                   // }
 
-                  const msg = JSON.parse(data[0]);
-                  const curChatState = this.state.chats[msg.peerId] || this.defaultChat;
+                  console.log('this incoming data is:');
+                  console.dir(data);
+
+                  let msg;
+
+                  try {
+                    msg = openMessage(data, this.identity);
+                  } catch (e) {
+                    console.error('Unable to open the incoming message.');
+                    console.error(e);
+                    return;
+                  }
+
+                  console.log('gotz me an new incoming msg:');
+                  console.dir(msg);
+
+                  if (msg.type !== 'CHAT') return;
+
+                  const curChatState = this.state.chats[msg.receiverId] || this.defaultChat;
                   const curUnreadCount = curChatState.unread || 0;
 
                   const chatState = {
@@ -418,39 +432,46 @@ class App extends Component {
 
           console.log(`connected to ${peerId}`);
 
-          this.node._libp2pNode.dialProtocol(peer, 'dabears/1', (err, conn) => {
+          this.node._libp2pNode.dialProtocol(peer, '/openbazaar/app/1.0.0', (err, conn) => {
             if (err) { 
               updateAfterSend(true);
               return console.error(err);
             }
 
-            const payload = this.getChatPayload(msg);
-            // const Chat = this.ChatPB;
-            // const chat = Chat.create(payload);
-            // const serializedChat = Chat.encode(chat).finish();
-            const serializedChat = JSON.stringify({
-              ...payload,
-              peerId: peerIdFrom,
-            });
+            generateChatMessage(
+              peerId,
+              this.identity,
+              this.getChatPayload(msg),
+            ).then(
+              encodedChatMsg => {
+                console.log('pushing outgoing message');
+                console.log(encodedChatMsg);
+                
+                pull(
+                  pull.once(encodedChatMsg),
+                  conn,
+                  pull.collect((err, data) => {
+                    if (err) { 
+                      return console.error(err);
+                    }
+                    console.log('received echo:', data.toString())
+                  }),            
+                );
 
-            console.log('pushing outgoing message');
-            
-            pull(
-              pull.once(serializedChat),
-              conn,
-              pull.collect((err, data) => {
-                if (err) { 
-                  return console.error(err);
-                }
-                console.log('received echo:', data.toString())
-              }),            
+                updateAfterSend();
+              },
+              err => {
+                console.error(err);
+                updateAfterSend(true);
+              }
             );
-
-            updateAfterSend();
           });
         });
       })
-      .catch(e => updateAfterSend());
+      .catch(e => {
+        console.error(e);
+        updateAfterSend(true)
+      });
   }
 
   handleConvoDidMount(receiver) {
