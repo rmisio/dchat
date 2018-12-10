@@ -131,13 +131,11 @@ function openChatMessage(message) {
 }
 
 // todo: change identityKey to identity
+// expecting b64 message
 export function openMessage(message, identityKey) {
-  // Decode the base64
-  const decodedMessage = new Buffer(message, 'base64');
-
-  const nonce = decodedMessage.slice(0,24);
-  const pubkey = decodedMessage.slice(24,56);
-  const cipherText = decodedMessage.slice(56, decodedMessage.length);
+  const nonce = message.slice(0,24);
+  const pubkey = message.slice(24,56);
+  const cipherText = message.slice(56, message.length);
   const privKey = ed2curve.convertSecretKey(identityKey._key);
 
   const out = nacl.box.open(cipherText, nonce, pubkey, privKey);

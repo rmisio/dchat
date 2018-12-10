@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import protobuf from 'protobufjs';
 import IPFS from 'ipfs';
 import { createFromBytes } from 'peer-id'
-import { fromByteArray } from 'base64-js';
+import { fromByteArray, toByteArray } from 'base64-js';
 import multihashes from 'multihashes';
 import pull from 'pull-stream';
 import {
@@ -251,7 +251,8 @@ class App extends Component {
                   // }
 
                   console.log('this incoming data is:');
-                  console.dir(data);
+                  console.log(fromByteArray(data));
+                  console.log(data);
 
                   let msg;
 
@@ -446,6 +447,7 @@ class App extends Component {
               encodedChatMsg => {
                 console.log('pushing outgoing message');
                 console.log(encodedChatMsg);
+                console.log(toByteArray(encodedChatMsg))
                 
                 pull(
                   pull.once(encodedChatMsg),
