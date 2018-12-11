@@ -9,7 +9,10 @@ import crypto from 'crypto';
 import protobuf from 'protobufjs';
 import IPFS from 'ipfs';
 import { createFromBytes } from 'peer-id'
-import { fromByteArray, toByteArray } from 'base64-js';
+import {
+  fromByteArray,
+  toB58String,
+} from 'base64-js';
 import multihashes from 'multihashes';
 import pull from 'pull-stream';
 import {
@@ -18,7 +21,7 @@ import {
 } from '../util/crypto';
 import {
   generateChatMessage,
-  openMessage,
+  openDirectMessage,
 } from '../util/messaging';
 import jsonDescriptor from '../message.json';
 import './App.scss';
@@ -209,6 +212,43 @@ class App extends Component {
     });
   }
 
+  handleInbounChatMessage(message, sender) {
+    if (message.type !== 'CHAT') return;
+
+    if (!message.message) return;
+
+    const curChatState = this.state.chats[sender] || this.defaultChat;
+    const curUnreadCount = curChatState.unread || 0;
+
+    const chatState = {
+      ...curChatState,
+      unread: this.props.location.pathname
+        .startsWith(`/chat/${sender}`) && document.hasFocus() ?
+          0 : curUnreadCount + 1,
+      messages: [
+        ...curChatState.messages,
+        {
+          id: message.messageId,
+          outgoing: false,
+          msg: message.message,
+          sending: false,
+          failed: false,
+        },
+      ],
+    }
+
+    this.setState({
+      chats: {
+        ...this.state.chats,
+        [sender]: chatState,
+      }
+    });
+
+    if (!document.hasFocus()) {
+      this.updateTitleCount();
+    }
+  }
+
   handleLogin(seed) {
     if (!seed || typeof seed !== 'string') {
       alert('I\'m gonna need a seed slick willy!');
@@ -243,62 +283,39 @@ class App extends Component {
                       'message:', err);
                   }
 
-                  // try {
-                  //   const decodedChatMsg = this.ChatPB.decode(data[0]);
-                  //   console.dir(decodedChatMsg);
-                  // } catch (e) {
-                  //   console.error('There was an error decoding the incoming message:', err);
-                  // }
+                  console.log('this incoming data is moo:');
+                  window.moo = data;
 
-                  console.log('this incoming data is:');
-                  console.log(fromByteArray(data));
-                  console.log(data);
+                  conn.getPeerInfo((err, peerInfo) => {
+                    console.log('got the peer info.');
 
-                  let msg;
-
-                  try {
-                    msg = openMessage(data, this.identity);
-                  } catch (e) {
-                    console.error('Unable to open the incoming message.');
-                    console.error(e);
-                    return;
-                  }
-
-                  console.log('gotz me an new incoming msg:');
-                  console.dir(msg);
-
-                  if (msg.type !== 'CHAT') return;
-
-                  const curChatState = this.state.chats[msg.receiverId] || this.defaultChat;
-                  const curUnreadCount = curChatState.unread || 0;
-
-                  const chatState = {
-                    ...curChatState,
-                    unread: this.props.location.pathname
-                      .startsWith(`/chat/${msg.peerId}`) && document.hasFocus() ?
-                        0 : curUnreadCount + 1,
-                    messages: [
-                      ...curChatState.messages,
-                      {
-                        id: msg.messageId,
-                        outgoing: false,
-                        msg: msg.message,
-                        sending: false,
-                        failed: false,
-                      },
-                    ],
-                  }
-
-                  this.setState({
-                    chats: {
-                      ...this.state.chats,
-                      [msg.peerId]: chatState,
+                    if (err) {
+                      console.error(`Unable to obtain the peerInfo for a direct message: ${err}`);
+                      return;
                     }
-                  });
 
-                  if (!document.hasFocus()) {
-                    this.updateTitleCount();
-                  }
+                    const sender = createFromBytes(peerInfo.id.id).toB58String();
+                    const messages = [];
+                    
+                    data.forEach(msg => {
+                      console.log('processing incoming msg');
+                      console.dir(msg);
+
+                      try {
+                        messages.push(openDirectMessage(msg));
+                      } catch (e) {
+                        console.error(`Unable to open direct message: ${e}`);
+                      }
+                    });
+
+                    if (!messages.length) return;
+
+                    messages.forEach(msg => {
+                      if (msg.type === 'CHAT') {
+                        this.handleInbounChatMessage(msg, sender);
+                      }
+                    });
+                  });                  
                 }),
               );
             });
@@ -441,16 +458,15 @@ class App extends Component {
 
             generateChatMessage(
               peerId,
-              this.identity,
               this.getChatPayload(msg),
+              this.identity,
             ).then(
-              encodedChatMsg => {
-                console.log('pushing outgoing message');
-                console.log(encodedChatMsg);
-                console.log(toByteArray(encodedChatMsg))
+              chatMsg => {
+                console.log('pushing outgoing message bam');
+                window.bam = chatMsg;
                 
                 pull(
-                  pull.once(encodedChatMsg),
+                  pull.once(chatMsg),
                   conn,
                   pull.collect((err, data) => {
                     if (err) { 
