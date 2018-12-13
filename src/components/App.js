@@ -156,9 +156,6 @@ class App extends Component {
       },
       relay: {
         "enabled": true,
-        "hop": {
-          "enabled": true
-        }
       },
       repo: `./ipfs/${peerId}`,
       init: { privateKey },

@@ -168,7 +168,15 @@ function openChatMessage(message) {
 
 export function openDirectMessage(messagePb) {
   const Message = getProtoRoot().lookupType('Message');
-  const message = Message.decode(messagePb);
+  let message;
+
+  try {
+    message = Message.decodeDelimited(messagePb);
+  } catch (e) {
+    console.error(`Unable to decode message in an delimted way - ${e}. ` +
+      'Will try undelimited.');
+    message = Message.decodeDelimited(messagePb);
+  }
 
   switch (message.messageType) {
     case 1:
