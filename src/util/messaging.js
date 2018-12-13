@@ -175,7 +175,7 @@ export function openDirectMessage(messagePb) {
   } catch (e) {
     console.error(`Unable to decode message in an delimted way - ${e}. ` +
       'Will try undelimited.');
-    message = Message.decodeDelimited(messagePb);
+    message = Message.decode(messagePb);
   }
 
   switch (message.messageType) {
