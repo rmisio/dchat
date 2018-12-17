@@ -9,10 +9,7 @@ import crypto from 'crypto';
 import protobuf from 'protobufjs';
 import IPFS from 'ipfs';
 import { createFromBytes } from 'peer-id'
-import {
-  fromByteArray,
-  toB58String,
-} from 'base64-js';
+import { fromByteArray } from 'base64-js';
 import multihashes from 'multihashes';
 import pull from 'pull-stream';
 import {
@@ -49,6 +46,7 @@ class App extends Component {
     //         outgoing: true,
     //         msg: 'You feelin the funk or what?',
     //         sending: false,
+    //         offline: false,
     //         failed: false,
     //       },
     //       {
@@ -56,6 +54,7 @@ class App extends Component {
     //         outgoing: true,
     //         msg: 'Hey!',
     //         sending: false,
+    //         offline: false,
     //         failed: false,
     //       },          
     //       {
@@ -63,6 +62,7 @@ class App extends Component {
     //         outgoing: false,
     //         msg: 'No doubt trey bingo. Why dont you try it on the west end so you could see if you could consolidate the peach trea with the left-over minutia? Eh!',
     //         sending: false,
+    //         offline: false,
     //         failed: false,
     //       },
     //     ],
@@ -261,8 +261,15 @@ class App extends Component {
         const node = new IPFS(ipfsInitOpts);
 
         node.on('ready', () => {
-          node.libp2p.start((...args) => {
+          node.libp2p.start(() => {
             this.node = node;
+            console.log('the node is erode.');
+            window.node = node;
+
+            // todo: create a custom node class that extends the ipfs one so stuff like the identity
+            // key can be added in, in a better way than a private prop.
+            this.node.__identity = identity;
+
             this.identity = identity;
             this.setState({ userId: peerId });
 
@@ -412,7 +419,7 @@ class App extends Component {
       },
     });
 
-    const updateAfterSend = (failed=false) => {
+    const updateAfterSend = (failed = false) => {
       this.setState({
         chats: {
           ...this.state.chats,
@@ -437,56 +444,50 @@ class App extends Component {
     const peer = `/p2p-circuit/ipfs/${peerId}`;
     console.log(`will send to ${peerId} at ${peer}`);
 
-    this.relayConnect()
-      .then(() => {
-        this.node.swarm.connect(peer, err => {
-          if (err) { 
-            updateAfterSend(true);
-            return console.error(err);
-          }
+    const handleError = e => {
+      updateAfterSend(true);
+      console.error(`There was an error sending the message: ${e}`);
+    };
 
-          console.log(`connected to ${peerId}`);
+    try {
+      await this.relayConnect();
+      await this.node.swarm.connect(peer);
+      console.log(`connected to ${peerId}`);
 
-          this.node._libp2pNode.dialProtocol(peer, '/openbazaar/app/1.0.0', (err, conn) => {
-            if (err) { 
-              updateAfterSend(true);
-              return console.error(err);
-            }
+      this.node._libp2pNode.dialProtocol(peer, '/openbazaar/app/1.0.0',
+        (err, conn) => {
+          try {
+            if (err) throw err;
 
-            generateChatMessage(
+            const chatMsg = await generateChatMessage(
               peerId,
               this.getChatPayload(msg),
               this.identity,
-            ).then(
-              chatMsg => {
-                console.log('pushing outgoing message bam');
-                window.bam = chatMsg;
-                
-                pull(
-                  pull.once(chatMsg),
-                  conn,
-                  pull.collect((err, data) => {
-                    if (err) { 
-                      return console.error(err);
-                    }
-                    console.log('received echo:', data.toString())
-                  }),            
-                );
-
-                updateAfterSend();
-              },
-              err => {
-                console.error(err);
-                updateAfterSend(true);
-              }
             );
-          });
+
+            console.log('pushing outgoing message bam');
+            window.bam = chatMsg;
+                
+            pull(
+              pull.once(chatMsg),
+              conn,
+              pull.collect((err, data) => {
+                if (err) { 
+                  return console.error(err);
+                }
+                console.log('received echo:', data.toString())
+              }),            
+            );
+
+            updateAfterSend();
+          } catch (e) {
+            handleError(e);
+          }
         });
-      })
-      .catch(e => {
-        console.error(e);
-        updateAfterSend(true)
-      });
+
+    } catch (e) {
+      handleError(e);
+    }
   }
 
   handleConvoDidMount(receiver) {

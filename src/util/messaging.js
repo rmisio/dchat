@@ -5,8 +5,8 @@ import ed2curve from 'ed2curve';
 import crypto from 'crypto';
 import libp2pCrypto from 'libp2p-crypto';
 import multihashes from 'multihashes';
+import CID from 'cids';
 import { createFromPubKey } from 'peer-id';
-import { fromByteArray } from 'base64-js';
 import jsonDescriptor from '../message.json';
 import { IPNS_BASE_URL } from './constants';
 
@@ -160,6 +160,28 @@ export function generateChatMessage(peerId, payload, identityKey, options = {}) 
   });  
 }
 
+function sendStoreMessage(peerId, cids) {
+
+}
+
+export async function sendOfflineChatMessage(peerId, payload, node, options = {}) {
+  const envelope = await generateChatMessage(peerId, payload, node.__identityKey, {
+    ...options,
+    offline: true,
+  });
+  const envDigest = crypto.createHash('sha256').update(envelope).digest();
+  const hexEnvDigest = envDigest.toString('hex');
+  const envBuffer = Buffer.from(hexEnvDigest, 'hex');
+  const { repoPath } = await node.repo.stat();
+  const { ipfsHash } = await node.add([{
+    path: repoPath,
+    content: envBuffer,
+  }]);
+  const cid = new CID(ipfsHash);
+  console.log('hip hopper');
+  window.hip = cid;
+}
+
 // Perhaps the following handlers should be in a seperate messageHandlers file?
 function openChatMessage(message) {
   const Chat = getProtoRoot().lookupType('Chat');
@@ -171,12 +193,15 @@ export function openDirectMessage(messagePb) {
   let message;
 
   try {
-    message = Message.decodeDelimited(messagePb);
-  } catch (e) {
-    console.error(`Unable to decode message in an delimted way - ${e}. ` +
-      'Will try undelimited.');
     message = Message.decode(messagePb);
+  } catch (e) {
+    console.error(`Unable to decode message in an undelimted way - ${e}. ` +
+      'Will try delimited.');
+    message = Message.decodeDelimited(messagePb);
   }
+
+  console.log('decoded the message slick');
+  window.slick = message;
 
   switch (message.messageType) {
     case 1:

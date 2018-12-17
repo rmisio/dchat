@@ -61,6 +61,11 @@
           top: 5px;
           left: 0;
           transform: translateX(calc(-100% - 5px));
+
+          .offline {
+            font-size: 12px;
+            line-height: 1px;
+          }
         }
 
         &.outgoing {

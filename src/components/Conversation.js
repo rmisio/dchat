@@ -89,14 +89,24 @@ class Conversation extends Component {
             {
               this.props.messages.map(msg => {
                 let statusEl = null;
-                
+                let statusElContent = null;
+
                 if (msg.sending) {
-                  statusEl = <span>📡</span>
+                  statusElContent = <div>📡</div>;
                 } else if (msg.failed) {
-                  statusEl = <span>❌</span>
+                  statusElContent = <div>❌</div>;
                 }
 
+                if (msg.offline) {
+                  statusElContent += <div class="offline">(offline)</div>;
+                }
+
+                if (statusElContent) {
+                  statusEl = <div class="flexVCent">{statusElContent}</div>;
+                }
+                
                 const msgClass = msg.outgoing ? 'outgoing' : '';
+                
                 return (
                   <div  className={msgClass} key={msg.id}>
                     <div className="status">{statusEl}</div>
