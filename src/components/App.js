@@ -17,8 +17,9 @@ import {
   identityKeyFromSeed,
 } from '../util/crypto';
 import {
-  generateChatMessage,
+  relayConnect,
   openDirectMessage,
+  sendChatMessage,
   sendOfflineChatMessage,
 } from '../util/messaging';
 import jsonDescriptor from '../message.json';
@@ -156,53 +157,6 @@ class App extends Component {
     }
   }
 
-  get ipfsRelayPeer() {
-    return '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
-  }
-
-  relayConnect() {
-    if (this._relayConnectPromise) {
-      return this._relayConnectPromise;
-    }
-
-    return new Promise((res, rej) => {
-      const always = () => this._relayConnectPromise = null;
-      const resolve = (...args) => {
-        always();
-        res(...args);
-      };
-      const reject = (...args) => {
-        always();
-        resolve(...args);
-      };
-
-      if (!this.moo || this.moo < 3) {
-        this.moo = this.moo ? this.moo++ : 0;
-        reject();
-      }
-
-      if (!this.node) {
-        reject(new Error('There is no active IPFS node.'));
-        return;
-      }
-
-      this.node._libp2pNode.dialFSM(this.ipfsRelayPeer, '/openbazaar/app/1.0.0', (err, connFSM) => {
-        if (err) {
-          alert('Unable to connect to the relay peer. Are you sure it\'s ' +
-            'running?');
-          console.error(`Unable to connect to the relay peer at ${this.ipfsRelayPeer}.`);
-          console.error(err);
-          reject(err);
-          return;
-        }
-
-        console.log('connected to the relay');
-        connFSM.on('close', () => this.relayConnect());
-        resolve();
-      });
-    });
-  }
-
   handleInbounChatMessage(message, sender) {
     if (message.type !== 'CHAT') return;
 
@@ -268,7 +222,7 @@ class App extends Component {
 
             this.setState({ userId: peerId });
 
-            this.relayConnect();
+            relayConnect(this.node);
             
             // handle incoming messages
             node._libp2pNode.handle('/openbazaar/app/1.0.0', (protocol, conn) => {
@@ -464,67 +418,74 @@ class App extends Component {
       });
     }
 
-    const peer = `/p2p-circuit/ipfs/${peerId}`;
-    console.log(`will send to ${peerId} at ${peer}`);
-
     const chatPayload = this.getChatPayload(msg);
+    let onlineFailed = false;
 
-    new Promise((resolve, reject) => {
-      this.relayConnect()
-        .then(() => {
-          return this.node.swarm.connect(peer);
-        })
-        .then(() => {
-          console.log(`connected to ${peerId}`);
-
-          this.node._libp2pNode.dialProtocol(peer, '/openbazaar/app/1.0.0',
-            (err, conn) => {
-              if (err) reject(err);
-
-              generateChatMessage(
-                peerId,
-                chatPayload,
-                this.node.__identity,
-              )
-                .then(chatMsg => {
-                  resolve({ conn, chatMsg });
-                })
-                .catch(e => reject(e));
-            });
-        })
-          .catch(e => reject(e));
-    })
-      .then(data => {
-        console.log('pushing outgoing message bam');
-        window.bam = data.chatMsg;
-            
-        pull(
-          pull.once(data.chatMsg),
-          data.conn,
-          pull.collect((err, data) => {
-            if (err) { 
-              return console.error(err);
-            }
-            console.log('received echo:', data.toString())
-            window.echo = data;
-          }),            
-        );
-
-        updateAfterSend();
+    sendChatMessage(this.node, peerId, chatPayload)
+      .then(() => {
+        updateAfterSend();        
       })
       .catch(e => {
         // updateAfterSend(true);
-        console.error(`Unable to send the message directly: ${e}`);
+        onlineFailed = true;
+        console.error('Unable to send the message directly');
+        console.error(e.stack);        
         console.log('Attempting to send offline.');
-        return sendOfflineChatMessage(peerId, chatPayload, this.node);
+        return sendOfflineChatMessage(this.node, peerId, chatPayload);
       })
       .then(() => {
+        if (!onlineFailed) return;
         console.log('offline flava what wattles');
       })
       .catch(e => {
         console.error('There was an error sending the offline message.');
         console.error(e.stack);
       });
+
+    // new Promise((resolve, reject) => {
+    //   this.relayConnect()
+    //     .then(() => {
+    //       return this.node.swarm.connect(peer);
+    //     })
+    //     .then(() => {
+    //       console.log(`connected to ${peerId}`);
+
+    //       this.node._libp2pNode.dialProtocol(peer, '/openbazaar/app/1.0.0',
+    //         (err, conn) => {
+    //           if (err) reject(err);
+
+    //           generateChatMessage(
+    //             peerId,
+    //             chatPayload,
+    //             this.node.__identity,
+    //           )
+    //             .then(chatMsg => {
+    //               resolve({ conn, chatMsg });
+    //             })
+    //             .catch(e => reject(e));
+    //         });
+    //     })
+    //       .catch(e => reject(e));
+    // })
+    //   .then(data => {
+    //     console.log('pushing outgoing message bam');
+    //     window.bam = data.chatMsg;
+            
+    //     pull(
+    //       pull.once(data.chatMsg),
+    //       data.conn,
+    //       pull.collect((err, data) => {
+    //         if (err) { 
+    //           return console.error(err);
+    //         }
+    //         console.log('received echo:', data.toString())
+    //         window.echo = data;
+    //       }),            
+    //     );
+
+    //     updateAfterSend();
+    //   })
+
   }
 
   handleConvoDidMount(receiver) {

@@ -1,11 +1,11 @@
 import axios from 'axios';
+import pull from 'pull-stream';
 import protobuf from 'protobufjs';
 import nacl from 'tweetnacl';
 import ed2curve from 'ed2curve';
 import crypto from 'crypto';
 import libp2pCrypto from 'libp2p-crypto';
 import multihashes from 'multihashes';
-import CID from 'cids';
 import { createFromPubKey } from 'peer-id';
 import jsonDescriptor from '../message.json';
 import { IPNS_BASE_URL } from './constants';
@@ -39,14 +39,16 @@ function generateMessageEnvelope(peerId, identityKey, messagePayload, options = 
 
         const pubkeyBytes = Buffer.from(hexKey, 'hex');
         const receiverPubKey = libp2pCrypto.keys.unmarshalPublicKey(pubkeyBytes);
+
         const Message = getProtoRoot().lookupType('Message');
-        const Envelope = getProtoRoot().lookupType('Envelope');
-        const messagePb = Message.create(messagePayload);
-        var serializedMessage = Message.encode(messagePb).finish();
+        const messagePb = generateMessagePb(messagePayload)
+        const serializedMessage = Message.encode(messagePb).finish();
 
         // todo: why does this bomb if I use the private key and it's forcing me
         // to use a private property?
         const signature = nacl.sign.detached(serializedMessage, identityKey._key);
+
+        const Envelope = getProtoRoot().lookupType('Envelope');
         const envelopePayload = {
           message: messagePb,
           pubkey: identityKey.publicKey,
@@ -112,17 +114,17 @@ function generateMessagePb(payload, options = {}) {
     message;
 }
 
-function getMessagePayload(messageType, typeUrl, value) {
+function getMessagePayload(messageType, urlType, value) {
   return {
     messageType,
     payload: {
-      type_url: typeUrl,
+      type_url: `type.googleapis.com/${urlType}`,
       value,
     }
   }
 }
 
-export function generateChatMessage(peerId, payload, identityKey, options = {}) {
+function generateChatMessage(peerId, payload, identityKey, options = {}) {
   const opts = {
     offline: false,
     ...options,
@@ -139,18 +141,14 @@ export function generateChatMessage(peerId, payload, identityKey, options = {}) 
 
     const chat = Chat.create(payload);
     const serializedChat = Chat.encode(chat).finish();
-    const messagePayload = {
-      messageType: 1,
-      payload: {
-        type_url: 'type.googleapis.com/Chat',
-        value: serializedChat,
-      }
-    };
-
+    const messagePayload = getMessagePayload(1, 'Chat', serializedChat);
 
     if (!opts.offline) {
       resolve(generateMessagePb(messagePayload, { encode: true }));
     } else {
+      // function generateMessageEnvelope(peerId, identityKey, messagePayload, options = {}) {
+      console.log(`the pid is ${peerId}`);
+      window.pid = peerId;
       return generateMessageEnvelope(peerId, identityKey, payload, options)
         .then(
           (...args) => resolve(...args),
@@ -162,29 +160,6 @@ export function generateChatMessage(peerId, payload, identityKey, options = {}) 
 
 function sendStoreMessage(peerId, cids) {
 
-}
-
-export async function sendOfflineChatMessage(peerId, payload, node, options = {}) {
-  const envelope = await generateChatMessage(peerId, payload, node.__identity, {
-    ...options,
-    offline: true,
-  });
-  const envDigest = crypto.createHash('sha256').update(envelope).digest();
-  const hexEnvDigest = envDigest.toString('hex');
-  const envBuffer = Buffer.from(hexEnvDigest, 'hex');
-  const { repoPath } = await node.repo.stat();
-  const filly = await node.add([{
-    path: `${repoPath}/outbox/${hexEnvDigest}`,
-    content: envBuffer,
-  }]);
-  console.log(`${repoPath}/outbox/${hexEnvDigest}`);
-  console.log('filly');
-  window.filly = filly;
-  // console.log(`the ipfs hash is mash: ${hash}`);
-  // window.mash = hash;
-  // const cid = new CID(hash);
-  // console.log('hip hopper');
-  // window.hip = cid;
 }
 
 // Perhaps the following handlers should be in a seperate messageHandlers file?
@@ -239,13 +214,10 @@ export function openOfflineMessage(message, identityKey) {
       // window.zip = out;
     }
 
-    // const MessagePb = getProtoRoot().lookupType('Message');
     const EnvelopePb = getProtoRoot().lookupType('Envelope');
     const envelope = EnvelopePb.decode(out);
 
-    // const deserializedMsg = MessagePb.decode(envelope.message);
-    // const messageType = deserializedMsg.messageType;
-    const receiverId = createFromPubKey(Buffer.from(envelope.pubkey), (err, data) => {
+    createFromPubKey(Buffer.from(envelope.pubkey), (err, data) => {
       if (err) {
         reject(err);
         return;
@@ -270,5 +242,164 @@ export function openOfflineMessage(message, identityKey) {
           );
       }
     });
+  });
+}
+
+const ipfsRelayPeer =
+  '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
+let relayConnectPromise;
+
+export function relayConnect(node) {
+  if (relayConnectPromise) {
+    return relayConnectPromise;
+  }
+
+  if (!node) {
+    throw new Error('Please provide an ipfs node.');
+  }
+
+  return new Promise((res, rej) => {
+    const always = () => relayConnectPromise = null;
+    const resolve = (...args) => {
+      always();
+      res(...args);
+    };
+    const reject = (...args) => {
+      always();
+      resolve(...args);
+    };
+
+    node._libp2pNode.dialFSM(ipfsRelayPeer, '/openbazaar/app/1.0.0', (err, connFSM) => {
+      if (err) {
+        console.error(`Unable to connect to the relay peer at ${ipfsRelayPeer}.`);
+        console.error(err);
+        reject(err);
+        return;
+      }
+
+      console.log('connected to the relay');
+      connFSM.on('close', () => relayConnect(node));
+      resolve();
+    });
+  });
+}
+
+function _sendMessage(node, peerId, message, options = {}) {
+  if (!node) {
+    throw new Error('Please provide an ipfs node.');
+  }
+
+  const opts = {
+    timeout: 1000 * 60 * 2,
+    waitForResponse: false,
+    ...options,
+  }
+
+  const peer = `/p2p-circuit/ipfs/${peerId}`;
+  console.log(`will send to ${peerId} at ${peer}`);
+
+  let timeout;
+
+  return new Promise((resolve, reject) => {
+    if (opts.waitForResponse) {
+      timeout = setTimeout(() => {
+        reject(new Error('Timed-out waiting for reponse.'));
+      }, opts.timeout);
+    }
+
+    relayConnect(node)
+      .then(() => {
+        return node.swarm.connect(peer);
+      })
+      .then(() => {
+        console.log(`connected to ${peerId}`);
+
+        node._libp2pNode.dialProtocol(peer, '/openbazaar/app/1.0.0',
+          (err, conn) => {
+            if (err) reject(err);
+
+            console.log('pushing outgoing message bam');
+            window.bam = message;
+
+            let getResponse = null;
+
+            if (opts.waitForResponse) {
+              getResponse = pull.collect((err, data) => {
+                if (err) { 
+                  reject(err);
+                }
+                console.log('received echo:', data.toString())
+                window.echo = data;
+                resolve(data);
+              });
+            }
+                
+            pull(
+              pull.once(message),
+              conn,
+              getResponse,
+            );
+
+            if (!opts.waitForResponse) {
+              resolve();
+            }
+          });
+      })
+        .catch(e => reject(e));
+  })
+    .finally(() => clearTimeout(timeout));
+}
+
+export function sendMessage(node, peerId, message, options = {}) {
+  return _sendMessage(node, peerId, message, {
+    ...options,
+    waitForResponse: false,
+  });
+}
+
+export async function sendChatMessage(node, peerId, payload) {
+  const chatMsg = await generateChatMessage(
+    peerId,
+    payload,
+    node.__identity,
+  );
+
+  return sendMessage(node, peerId, chatMsg);
+}
+
+export async function sendOfflineChatMessage(node, peerId, payload, options = {}) {
+  const envelope = await generateChatMessage(peerId, payload, node.__identity, {
+    ...options,
+    offline: true,
+  });
+  const envDigest = crypto.createHash('sha256').update(envelope).digest();
+  const hexEnvDigest = envDigest.toString('hex');
+  const envBuffer = Buffer.from(hexEnvDigest, 'hex');
+  const { repoPath } = await node.repo.stat();
+  const filePath = `${repoPath}/outbox/${hexEnvDigest}`;
+  const files = await node.add([{
+    path: filePath,
+    content: envBuffer,
+  }]);
+  
+  const file = files.find(file => file.path === filePath); 
+
+  if (!file || !file.hash) {
+    throw new Error('Unable to obtain the file hash of the offline message.');
+  }
+
+  console.log(`the file hash is ${file.hash}`);
+
+  const CidList = getProtoRoot().lookupType('CidList');
+  const cidList = CidList.create([file.hash]);
+  const Message = getProtoRoot().lookupType('Message');
+  const messagePayload = getMessagePayload(18, 'Store', cidList.encode().finish);
+  const message = generateMessagePb(messagePayload, { encode: true });
+}
+
+export function sendRequest(node, peerId, message, options = {}) {
+  return _sendMessage(node, peerId, message, {
+    ...options,
+    waitForResponse: true,
   });
 }
