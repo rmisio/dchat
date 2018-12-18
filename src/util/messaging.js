@@ -165,7 +165,7 @@ function sendStoreMessage(peerId, cids) {
 }
 
 export async function sendOfflineChatMessage(peerId, payload, node, options = {}) {
-  const envelope = await generateChatMessage(peerId, payload, node.__identityKey, {
+  const envelope = await generateChatMessage(peerId, payload, node.__identity, {
     ...options,
     offline: true,
   });
@@ -173,13 +173,18 @@ export async function sendOfflineChatMessage(peerId, payload, node, options = {}
   const hexEnvDigest = envDigest.toString('hex');
   const envBuffer = Buffer.from(hexEnvDigest, 'hex');
   const { repoPath } = await node.repo.stat();
-  const { ipfsHash } = await node.add([{
-    path: repoPath,
+  const filly = await node.add([{
+    path: `${repoPath}/outbox/${hexEnvDigest}`,
     content: envBuffer,
   }]);
-  const cid = new CID(ipfsHash);
-  console.log('hip hopper');
-  window.hip = cid;
+  console.log(`${repoPath}/outbox/${hexEnvDigest}`);
+  console.log('filly');
+  window.filly = filly;
+  // console.log(`the ipfs hash is mash: ${hash}`);
+  // window.mash = hash;
+  // const cid = new CID(hash);
+  // console.log('hip hopper');
+  // window.hip = cid;
 }
 
 // Perhaps the following handlers should be in a seperate messageHandlers file?

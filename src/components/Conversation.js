@@ -98,11 +98,11 @@ class Conversation extends Component {
                 }
 
                 if (msg.offline) {
-                  statusElContent += <div class="offline">(offline)</div>;
+                  statusElContent += <div className="offline">(offline)</div>;
                 }
 
                 if (statusElContent) {
-                  statusEl = <div class="flexVCent">{statusElContent}</div>;
+                  statusEl = <div className="flexVCent">{statusElContent}</div>;
                 }
                 
                 const msgClass = msg.outgoing ? 'outgoing' : '';

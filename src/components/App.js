@@ -19,6 +19,7 @@ import {
 import {
   generateChatMessage,
   openDirectMessage,
+  sendOfflineChatMessage,
 } from '../util/messaging';
 import jsonDescriptor from '../message.json';
 import './App.scss';
@@ -126,18 +127,11 @@ class App extends Component {
   }
 
   clearUnreadCount(peerId) {
-    if (peerId && this.state.chats[peerId]) {
-      this.setState({
-        chats: {
-          ...this.state.chats,
-          [peerId]: {
-            ...this.state.chats[peerId],
-            unread: 0,
-          }
-        }
-      },
-      () => this.updateTitleCount());
-    }
+    this.updateChat(
+      peerId,
+      { unread: 0 },
+      () => this.updateTitleCount()
+    );
   }
 
   // need base58 peerId, base64 privateKey
@@ -234,6 +228,8 @@ class App extends Component {
       ],
     }
 
+    // TODO - make add chat message state function
+
     this.setState({
       chats: {
         ...this.state.chats,
@@ -270,7 +266,6 @@ class App extends Component {
             // key can be added in, in a better way than a private prop.
             this.node.__identity = identity;
 
-            this.identity = identity;
             this.setState({ userId: peerId });
 
             this.relayConnect();
@@ -382,7 +377,48 @@ class App extends Component {
       timestamp: { seconds: Math.floor(timestamp / 1000), nanos: 0},
       flag: 0
     };
-  }  
+  }
+
+  updateChat(peerId, state, cb) {
+    if (!this.state.chats || !!this.state.chats.peerId) return;
+
+    this.setState({
+      chats: {
+        ...this.state.chats,
+        [peerId]: {
+          ...this.state.chats[peerId],
+          ...state,
+        }
+      }
+    }, cb);
+  }
+
+  updateChatMessage(peerId, state, cb) {
+    if (!state.id) {
+      throw new Error('The state must include an id.');
+    }
+
+    if (!this.state.chats || !!this.state.chats.peerId) return;
+
+    this.setState({
+      chats: {
+        ...this.state.chats,
+        [peerId]: {
+          ...this.state.chats[peerId],
+          messages: this.state.chats[peerId].messages.map(msg => {
+            if (msg.id === state.id) {
+              return {
+                ...msg,
+                ...state,
+              }
+            } else {
+              return msg;
+            }
+          }),
+        }
+      },
+    }, cb);    
+  }
 
   handleChatSend(peerId, msg) {
     if (typeof peerId !== 'string' || !peerId.startsWith('Qm')) {
@@ -401,6 +437,7 @@ class App extends Component {
     const msgId = uuid4();
     const peerIdFrom = this.state.userId;
 
+    // todo: make addMessage function
     this.setState({
       chats: {
         ...this.state.chats,
@@ -420,90 +457,78 @@ class App extends Component {
     });
 
     const updateAfterSend = (failed = false) => {
-      this.setState({
-        chats: {
-          ...this.state.chats,
-          [peerId]: {
-            ...this.state.chats[peerId],
-            messages: this.state.chats[peerId].messages.map(msg => {
-              if (msg.id === msgId) {
-                return {
-                  ...msg,
-                  failed,
-                  sending: false,
-                }
-              } else {
-                return msg;
-              }
-            }),
-          }
-        },
-      });      
+      this.updateChatMessage(peerId, {
+        id: msgId,
+        failed,
+        sending: false,
+      });
     }
 
     const peer = `/p2p-circuit/ipfs/${peerId}`;
     console.log(`will send to ${peerId} at ${peer}`);
 
-    const handleError = e => {
-      updateAfterSend(true);
-      console.error(`There was an error sending the message: ${e}`);
-    };
+    const chatPayload = this.getChatPayload(msg);
 
-    try {
-      await this.relayConnect();
-      await this.node.swarm.connect(peer);
-      console.log(`connected to ${peerId}`);
+    new Promise((resolve, reject) => {
+      this.relayConnect()
+        .then(() => {
+          return this.node.swarm.connect(peer);
+        })
+        .then(() => {
+          console.log(`connected to ${peerId}`);
 
-      this.node._libp2pNode.dialProtocol(peer, '/openbazaar/app/1.0.0',
-        (err, conn) => {
-          try {
-            if (err) throw err;
+          this.node._libp2pNode.dialProtocol(peer, '/openbazaar/app/1.0.0',
+            (err, conn) => {
+              if (err) reject(err);
 
-            const chatMsg = await generateChatMessage(
-              peerId,
-              this.getChatPayload(msg),
-              this.identity,
-            );
+              generateChatMessage(
+                peerId,
+                chatPayload,
+                this.node.__identity,
+              )
+                .then(chatMsg => {
+                  resolve({ conn, chatMsg });
+                })
+                .catch(e => reject(e));
+            });
+        })
+          .catch(e => reject(e));
+    })
+      .then(data => {
+        console.log('pushing outgoing message bam');
+        window.bam = data.chatMsg;
+            
+        pull(
+          pull.once(data.chatMsg),
+          data.conn,
+          pull.collect((err, data) => {
+            if (err) { 
+              return console.error(err);
+            }
+            console.log('received echo:', data.toString())
+            window.echo = data;
+          }),            
+        );
 
-            console.log('pushing outgoing message bam');
-            window.bam = chatMsg;
-                
-            pull(
-              pull.once(chatMsg),
-              conn,
-              pull.collect((err, data) => {
-                if (err) { 
-                  return console.error(err);
-                }
-                console.log('received echo:', data.toString())
-              }),            
-            );
-
-            updateAfterSend();
-          } catch (e) {
-            handleError(e);
-          }
-        });
-
-    } catch (e) {
-      handleError(e);
-    }
+        updateAfterSend();
+      })
+      .catch(e => {
+        // updateAfterSend(true);
+        console.error(`Unable to send the message directly: ${e}`);
+        console.log('Attempting to send offline.');
+        return sendOfflineChatMessage(peerId, chatPayload, this.node);
+      })
+      .then(() => {
+        console.log('offline flava what wattles');
+      })
+      .catch(e => {
+        console.error('There was an error sending the offline message.');
+        console.error(e.stack);
+      });
   }
 
   handleConvoDidMount(receiver) {
-    const receiverChatState = this.state.chats[receiver];
-
-    if (receiverChatState) {
-      this.setState({
-        chats: {
-          ...this.state.chats,
-          [receiver]: {
-            ...receiverChatState,
-            unread: 0,
-          }
-        }
-      })
-    }
+    this.updateChat(receiver, { unread: 0 });
   }
 
   generateRegisterSeed() {
