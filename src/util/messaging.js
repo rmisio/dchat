@@ -392,8 +392,8 @@ export async function sendOfflineChatMessage(node, peerId, payload, options = {}
 
   const CidList = getProtoRoot().lookupType('CidList');
   const cidList = CidList.create([file.hash]);
-  const Message = getProtoRoot().lookupType('Message');
-  const messagePayload = getMessagePayload(18, 'Store', cidList.encode().finish);
+  const messagePayload =
+    getMessagePayload(18, 'Store', CidList.encode(cidList).finish);
   const message = generateMessagePb(messagePayload, { encode: true });
 }
 
