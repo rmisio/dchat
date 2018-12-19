@@ -255,9 +255,10 @@ class App extends Component {
                       console.dir(msg);
 
                       try {
-                        messages.push(openDirectMessage(msg));
+                        messages.push(openDirectMessage(msg, sender, this.node));
                       } catch (e) {
-                        console.error(`Unable to open direct message: ${e}`);
+                        console.error('Unable to open direct message');
+                        console.error(e.stack);
                       }
                     });
 
@@ -266,6 +267,8 @@ class App extends Component {
                     messages.forEach(msg => {
                       if (msg.type === 'CHAT') {
                         this.handleInbounChatMessage(msg, sender);
+                      } else if (msg.type === 'ERROR') {
+                        console.error(`Received an ERROR message: ${msg}`);
                       }
                     });
                   });                  
@@ -435,7 +438,6 @@ class App extends Component {
       })
       .then(() => {
         if (!onlineFailed) return;
-        console.log('offline flava what wattles');
       })
       .catch(e => {
         console.error('There was an error sending the offline message.');

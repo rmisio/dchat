@@ -1,5 +1,6 @@
 import axios from 'axios';
 import pull from 'pull-stream';
+// import toPull from 'stream-to-pull-stream';
 import protobuf from 'protobufjs';
 import nacl from 'tweetnacl';
 import ed2curve from 'ed2curve';
@@ -28,7 +29,12 @@ function generateMessageEnvelope(peerId, identityKey, messagePayload, options = 
   }
 
   return new Promise((resolve, reject) => {
-    axios.get(opts.pubkeyUrl)
+    // axios.get(opts.pubkeyUrl)
+    Promise.resolve({
+      data: {
+        pubkey: 'CAESIOd4zikCvE0qQdb1ie7HsQIcmhORXddTm7FHgZrS1qWN',
+      }
+    })
       .then(resp => {
         const hexKey = resp && resp.data && resp.data.pubkey;
 
@@ -37,11 +43,12 @@ function generateMessageEnvelope(peerId, identityKey, messagePayload, options = 
           return;
         }
 
-        const pubkeyBytes = Buffer.from(hexKey, 'hex');
+        // const pubkeyBytes = Buffer.from(hexKey, 'hex');
+        const pubkeyBytes = Buffer.from(hexKey, 'base64');
         const receiverPubKey = libp2pCrypto.keys.unmarshalPublicKey(pubkeyBytes);
 
         const Message = getProtoRoot().lookupType('Message');
-        const messagePb = generateMessagePb(messagePayload)
+        const messagePb = generateMessage(messagePayload)
         const serializedMessage = Message.encode(messagePb).finish();
 
         // todo: why does this bomb if I use the private key and it's forcing me
@@ -55,7 +62,7 @@ function generateMessageEnvelope(peerId, identityKey, messagePayload, options = 
           signature,
         };        
 
-        const envErr = Envelope.verify(envelopePayload)
+        const envErr = Envelope.verify(envelopePayload);
 
         if (envErr) {
           reject(new Error(`The envelope payload does not verify: ${envErr}`));
@@ -94,7 +101,7 @@ function generateMessageEnvelope(peerId, identityKey, messagePayload, options = 
   });
 }
 
-function generateMessagePb(payload, options = {}) {
+function generateMessage(payload, options = {}) {
   const opts = {
     encode: false,
     ...options,
@@ -142,13 +149,13 @@ function generateChatMessage(peerId, payload, identityKey, options = {}) {
     const chat = Chat.create(payload);
     const serializedChat = Chat.encode(chat).finish();
     const messagePayload = getMessagePayload(1, 'Chat', serializedChat);
+    const howdy = messagePayload;
+    console.log('your chat message is howdy');
+    window.howdy = howdy;    
 
     if (!opts.offline) {
-      resolve(generateMessagePb(messagePayload, { encode: true }));
+      resolve(generateMessage(messagePayload, { encode: true }));
     } else {
-      // function generateMessageEnvelope(peerId, identityKey, messagePayload, options = {}) {
-      console.log(`the pid is ${peerId}`);
-      window.pid = peerId;
       return generateMessageEnvelope(peerId, identityKey, payload, options)
         .then(
           (...args) => resolve(...args),
@@ -158,17 +165,34 @@ function generateChatMessage(peerId, payload, identityKey, options = {}) {
   });  
 }
 
-function sendStoreMessage(peerId, cids) {
-
-}
-
 // Perhaps the following handlers should be in a seperate messageHandlers file?
+// also they could probably be abstracted
 function openChatMessage(message) {
   const Chat = getProtoRoot().lookupType('Chat');
   return Chat.decode(message);
 }
 
-export function openDirectMessage(messagePb) {
+function openErrorMessage(message) {
+  const Err = getProtoRoot().lookupType('Error');
+  return Err.decode(message);
+}
+
+async function handleStoreMessage(message, peerId, node) {
+  // TODO - match with request ID
+  const CidList = getProtoRoot().lookupType('CidList');
+  const decodedMsg = CidList.decode(message);
+
+  for (const cid of decodedMsg.cids) {
+    const blockRes = await node.block.get(cid);
+    console.log(`sending block with cid ${cid} to ${peerId}`);
+    await sendBlockMessage(node, peerId, {
+      cid,
+      rawData: blockRes.data,
+    });
+  }
+}
+
+export function openDirectMessage(messagePb, peerId, node) {
   const Message = getProtoRoot().lookupType('Message');
   let message;
 
@@ -189,6 +213,22 @@ export function openDirectMessage(messagePb) {
       return {
         type: 'CHAT',
         ...openChatMessage(message.payload.value),
+      };
+    case 18:
+      // store message
+      handleStoreMessage(message.payload.value, peerId, node)
+        .catch(e => {
+          console.error('There was an error processing a Store message:', e);
+        });
+
+      return {
+        type: 'STORE',
+      };
+    case 500:
+      // error message
+      return {
+        type: 'ERROR',
+        ...openErrorMessage(message.payload.value),
       };
     default:
       throw new
@@ -333,12 +373,27 @@ function _sendMessage(node, peerId, message, options = {}) {
                 resolve(data);
               });
             }
+
+            // const duplexConn = toPull.duplex(conn);
                 
+            // pull(
+            //   pull.once(message),
+            //   duplexConn,
+            //   pull.drain(function (data) {
+            //     console.log('i got a sassy response');
+            //     window.sassy = data;
+            //   }, function (err) {
+            //     console.error('No sass here boy.');
+            //     window.sass = err;
+            //     if(err) console.error(err);
+            //   })
+            // );
+
             pull(
               pull.once(message),
               conn,
-              getResponse,
-            );
+              getResponse
+            );            
 
             if (!opts.waitForResponse) {
               resolve();
@@ -350,7 +405,7 @@ function _sendMessage(node, peerId, message, options = {}) {
     .finally(() => clearTimeout(timeout));
 }
 
-export function sendMessage(node, peerId, message, options = {}) {
+function sendMessage(node, peerId, message, options = {}) {
   return _sendMessage(node, peerId, message, {
     ...options,
     waitForResponse: false,
@@ -365,6 +420,55 @@ export async function sendChatMessage(node, peerId, payload) {
   );
 
   return sendMessage(node, peerId, chatMsg);
+}
+
+export async function sendBlockMessage(node, peerId, data) {
+  const Block = getProtoRoot().lookupType('Block');
+  const blockErr = Block.verify(data);
+
+  if (blockErr) {
+    throw new Error(`The Block payload does not verify: ${blockErr}`);
+  }
+
+  const block = Block.create(data);
+  const payload =
+    getMessagePayload(19, 'Block', Block.encode(block).finish());
+  const message = generateMessage(payload, { encode: true });
+
+  return sendMessage(
+    node,
+    peerId,
+    message
+  );
+}
+
+const pushNode = 'QmSEAdeDTUGMkuaqXCe7z3kfkLqrqwadMexRo9JfUJTCh5';
+
+function sendStoreMessage(node, peerId, data) {
+  const CidList = getProtoRoot().lookupType('CidList');
+  const cidListErr = CidList.verify(data);
+
+  if (cidListErr) {
+    throw new Error(`The cidList payload does not verify: ${cidListErr}`);
+  }
+
+  const cidList = CidList.create(data);
+  const payload =
+    getMessagePayload(18, 'CidList', CidList.encode(cidList).finish());
+  const message = generateMessage(payload, { encode: true });
+
+  return sendMessage(
+    node,
+    peerId,
+    message
+  );
+}
+
+export function sendRequest(node, peerId, message, options = {}) {
+  return _sendMessage(node, peerId, message, {
+    ...options,
+    waitForResponse: true,
+  });
 }
 
 export async function sendOfflineChatMessage(node, peerId, payload, options = {}) {
@@ -390,16 +494,5 @@ export async function sendOfflineChatMessage(node, peerId, payload, options = {}
 
   console.log(`the file hash is ${file.hash}`);
 
-  const CidList = getProtoRoot().lookupType('CidList');
-  const cidList = CidList.create([file.hash]);
-  const messagePayload =
-    getMessagePayload(18, 'Store', CidList.encode(cidList).finish);
-  const message = generateMessagePb(messagePayload, { encode: true });
-}
-
-export function sendRequest(node, peerId, message, options = {}) {
-  return _sendMessage(node, peerId, message, {
-    ...options,
-    waitForResponse: true,
-  });
+  await sendStoreMessage(node, pushNode, { cids: [file.hash] });
 }
