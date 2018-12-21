@@ -1,15 +1,22 @@
 import axios from 'axios';
 import pull from 'pull-stream';
 // import toPull from 'stream-to-pull-stream';
+import CID from 'cids';
 import protobuf from 'protobufjs';
 import nacl from 'tweetnacl';
 import ed2curve from 'ed2curve';
+// to do just import the functions you're using not the whole thing
 import crypto from 'crypto';
 import libp2pCrypto from 'libp2p-crypto';
-import multihashes from 'multihashes';
+import {
+  toB58String,
+  fromB58String,
+} from 'multihashes';
 import { createFromPubKey } from 'peer-id';
+// import { toByteArray } from 'base64-js';
 import jsonDescriptor from '../message.json';
 import { IPNS_BASE_URL } from './constants';
+import { createPointerKey } from './pointers';
 
 let protoRoot;
 
@@ -263,7 +270,7 @@ export function openOfflineMessage(message, identityKey) {
         return;
       }
 
-      const receiverId = multihashes.toB58String(data.id);
+      const receiverId = toB58String(data.id);
 
       switch (envelope.message.messageType) {
         case 1:
@@ -494,5 +501,17 @@ export async function sendOfflineChatMessage(node, peerId, payload, options = {}
 
   console.log(`the file hash is ${file.hash}`);
 
+  const supper = fromB58String(file.hash);
+  console.log('supper is ready jack.');
+  window.supper = supper;
+
   await sendStoreMessage(node, pushNode, { cids: [file.hash] });
+
+  const pointerKey = createPointerKey(fromB58String(file.hash));
+  const cid = new CID(pointerKey);
+  console.log('the cid is manner');
+  window.manner = cid;
 }
+
+console.log('buf');
+window.buf = Buffer;
