@@ -156,14 +156,20 @@ export function identityKeyFromSeed(mnemonic, bits = 4096) {
               return;
             }
 
+
             // todo: strip the 'Key' suffix from pub and priv
             resolve({
               peerId: peerId.toBytes(),
-              publicKey: keypair.public.bytes,
-              privateKey: keypair.bytes,
+              // publicKey: keypair.public.bytes,
+              // privateKey: keypair.bytes,
+              publicKey: keypair.public._key,
+              privateKey: keypair._key,
               ...keypair,
             });
           });
+
+        console.log('keypair au pair');
+        window.keypair = keypair;
       } else {
         reject(err);
       }

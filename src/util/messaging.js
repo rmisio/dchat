@@ -29,7 +29,7 @@ function getProtoRoot() {
 // todo: validate args
 // value should be a pb serialized payload for the given messageType
 // used for offline messages
-function generateMessageEnvelope(peerId, identityKey, messagePayload, options = {}) {
+export function generateMessageEnvelope(peerId, identityKey, messagePayload, options = {}) {
   const opts = {
     pubkeyUrl: `${IPNS_BASE_URL}/${peerId}`,
     ...options,
@@ -57,6 +57,10 @@ function generateMessageEnvelope(peerId, identityKey, messagePayload, options = 
         const Message = getProtoRoot().lookupType('Message');
         const messagePb = generateMessage(messagePayload)
         const serializedMessage = Message.encode(messagePb).finish();
+
+        console.log('pb serial');
+        window.pb = messagePb;
+        window.serial = serializedMessage;
 
         // todo: why does this bomb if I use the private key and it's forcing me
         // to use a private property?
@@ -91,6 +95,9 @@ function generateMessageEnvelope(peerId, identityKey, messagePayload, options = 
         
         // Create ciphertext
         const cipherText = nacl.box(serializedEnvelope, nonce, pubkeyCurve, ephemKeypair.secretKey);
+
+        console.log('the cy is boom');
+        window.boom = cipherText;
 
         // END: does this make send as an alternate encode function in crypto.js?
         
@@ -507,8 +514,12 @@ export async function sendOfflineChatMessage(node, peerId, payload, options = {}
 
   await sendStoreMessage(node, pushNode, { cids: [file.hash] });
 
-  const pointerKey = createPointerKey(fromB58String(file.hash));
-  const cid = new CID(pointerKey);
-  console.log('the cid is manner');
-  window.manner = cid;
+  // const pointer = ipfs.NewPointer(
+  //   fromB58String(peerId),
+  //   DefaultPointerPrefixLength, addr, ciphertext)
+
+  // const pointerKey = createPointerKey(fromB58String(file.hash));
+  // const cid = new CID(pointerKey);
+  // console.log('the cid is manner');
+  // window.manner = cid;
 }

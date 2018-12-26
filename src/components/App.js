@@ -21,6 +21,7 @@ import {
   openDirectMessage,
   sendChatMessage,
   sendOfflineChatMessage,
+  generateMessageEnvelope,
 } from '../util/messaging';
 import jsonDescriptor from '../message.json';
 import './App.scss';
@@ -219,6 +220,14 @@ class App extends Component {
             // todo: create a custom node class that extends the ipfs one so stuff like the identity
             // key can be added in, in a better way than a private prop.
             this.node.__identity = identity;
+            console.log('id me brah');
+            window.id = identity;
+
+            generateMessageEnvelope(
+              'QmZdt2iCugbXZ8RdeewyehTgr1tnMpkn8zbaSawwq6ydPh',
+              identity,
+              this.getChatPayload('howdy playa'),
+            );
 
             this.setState({ userId: peerId });
 
@@ -328,10 +337,12 @@ class App extends Component {
     const encoded = multihashes.encode(idBytesBuffer, 0x12);
 
     return {
-      messageId: multihashes.toB58String(encoded),
+      // messageId: multihashes.toB58String(encoded),
+      messageId: '12345',
       subject,
-      message,
-      timestamp: { seconds: Math.floor(timestamp / 1000), nanos: 0},
+      message: 'howdy playa',
+      // timestamp: { seconds: Math.floor(timestamp / 1000), nanos: 0},
+      timestamp: { seconds: 1545861981, nanos: 173368000},
       flag: 0
     };
   }
