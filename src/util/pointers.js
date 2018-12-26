@@ -1,9 +1,8 @@
 import BitArray from 'node-bitarray';
 import { createHash } from 'crypto';
-import { encode, decode } from 'multihashes';
+import { encode, decode, toB58String } from 'multihashes';
 
 export function createPointerKey(multihash, prefixLen = 14) {
-  // var digest = [176, 125, 168, 103, 115, 91, 9, 159, 41, 122, 141, 24, 201, 155, 147, 163, 240, 213, 104, 110, 99, 113, 89, 69, 20, 136, 28, 193, 13, 93, 157, 163]
   const decodedMh = decode(multihash);
   const digest = decodedMh.digest;
   const truncatedPrefix = digest.slice(0,8);
@@ -27,7 +26,17 @@ export function createPointerKey(multihash, prefixLen = 14) {
     ids.push(parseInt(tmpX, 2));
   }
 
-  const checksum = createHash('sha256').update(new Buffer(ids)).digest();
+  const checkSum = createHash('sha256').update(new Buffer(ids)).digest();
 
-  return encode(Buffer.from(checksum), 'sha2-256');
+  return encode(Buffer.from(checkSum), 'sha2-256');
+}
+
+const MAGIC = "000000000000000000000000";
+
+export function getMagicId(bytes) {
+  const hash = createHash('sha256').update(new Buffer(bytes)).digest();
+  const magicBytes = new Buffer(MAGIC, 'hex');
+  const prefixedBytes = Buffer.concat([magicBytes, hash.slice(0, 20)]);
+  const mh = encode(prefixedBytes, 'sha2-256');
+  return toB58String(mh);
 }

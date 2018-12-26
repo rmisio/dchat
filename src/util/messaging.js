@@ -512,6 +512,3 @@ export async function sendOfflineChatMessage(node, peerId, payload, options = {}
   console.log('the cid is manner');
   window.manner = cid;
 }
-
-console.log('buf');
-window.buf = Buffer;

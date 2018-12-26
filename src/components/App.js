@@ -325,7 +325,7 @@ class App extends Component {
     const idBytes = crypto.createHash('sha256').update(combinationString).digest();
     const idBytesArray = new Uint8Array(idBytes);
     const idBytesBuffer =  new Buffer(idBytesArray.buffer);
-    const encoded = multihashes.encode(idBytesBuffer,0x12);
+    const encoded = multihashes.encode(idBytesBuffer, 0x12);
 
     return {
       messageId: multihashes.toB58String(encoded),
