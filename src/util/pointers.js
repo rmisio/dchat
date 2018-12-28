@@ -1,6 +1,9 @@
 import BitArray from 'node-bitarray';
 import { createHash } from 'crypto';
 import { encode, decode, toB58String } from 'multihashes';
+import multiaddr from 'multiaddr';
+import PeerInfo from 'peer-info';
+import CID from 'cids';
 
 function createPointerKey(multihash) {
   const decodedMh = decode(multihash);
@@ -41,19 +44,17 @@ function getMagicId(bytes) {
   return toB58String(mh);
 }
 
-// export function newPointer(mh, )
-
-// const bytes = [18, 32, 196, 96, 35, 47, 245, 119, 199, 180, 82, 68, 139, 38, 25, 77, 36, 132, 22, 147, 127, 102, 173, 50, 180, 83, 141, 247, 164, 33, 106, 196, 58, 253];
-// const buf = new Buffer(bytes);
-// console.log(buf);
-// // const magicBuf = new Buffer(MAGIC, 'hex');
-// // console.log(magicBuf);
-// // // const mh = encode(buf, 'sha2-256');
-// // const theGoods = getMagicId(buf);
-// // console.log(theGoods);
-// const pointerKey = createPointerKey(encode(buf, 'sha2-256'), 14);
-// console.log(pointerKey);
-
-const poo = Buffer.from('CAESIOd4zikCvE0qQdb1ie7HsQIcmhORXddTm7FHgZrS1qWN', 'base64');
-console.log('poo in de shoe!');
-window.poo = poo;
+// func NewPointer(mhKey multihash.Multihash, prefixLen int, addr ma.Multiaddr, entropy []byte) (Pointer, error) {
+export function newPointer(multihash, mAddr, contentBytes) {
+  const key = createPointerKey(multihash);
+  const magicId = getMagicId(contentBytes);
+  const pi = new PeerInfo(magicId);
+  pi.multiaddrs.add(mAddr);
+  console.log(`the pointer key is ${key}`);
+  return {
+    Cid: (new CID(key))
+      .toV0()
+      .toBaseEncodedString(),
+    Value: pi,
+  }
+}

@@ -7,16 +7,19 @@ import nacl from 'tweetnacl';
 import ed2curve from 'ed2curve';
 // to do just import the functions you're using not the whole thing
 import crypto from 'crypto';
+// to do just import the functions you're using not the whole thing
 import libp2pCrypto from 'libp2p-crypto';
 import {
   toB58String,
   fromB58String,
 } from 'multihashes';
+import multiaddr from 'multiaddr'
 import { createFromPubKey } from 'peer-id';
 // import { toByteArray } from 'base64-js';
 import jsonDescriptor from '../message.json';
 import { IPNS_BASE_URL } from './constants';
-import { createPointerKey } from './pointers';
+import { encrypt } from './crypto';
+import { newPointer } from './pointers';
 
 let protoRoot;
 
@@ -29,91 +32,79 @@ function getProtoRoot() {
 // todo: validate args
 // value should be a pb serialized payload for the given messageType
 // used for offline messages
-export function generateMessageEnvelope(peerId, identityKey, messagePayload, options = {}) {
-  const opts = {
-    pubkeyUrl: `${IPNS_BASE_URL}/${peerId}`,
-    ...options,
-  }
+// change identityKey to identity
+// export function generateMessageEnvelope(peerId, identityKey, messagePayload, options = {}) {
+//   const opts = {
+//     pubkeyUrl: `${IPNS_BASE_URL}/${peerId}`,
+//     ...options,
+//   }
 
-  return new Promise((resolve, reject) => {
-    // axios.get(opts.pubkeyUrl)
-    Promise.resolve({
-      data: {
-        pubkey: 'CAESIOd4zikCvE0qQdb1ie7HsQIcmhORXddTm7FHgZrS1qWN',
-      }
-    })
-      .then(resp => {
-        const hexKey = resp && resp.data && resp.data.pubkey;
+//   return new Promise((resolve, reject) => {
+//     // axios.get(opts.pubkeyUrl)
+//     Promise.resolve({
+//       data: {
+//         pubkey: 'CAESIOd4zikCvE0qQdb1ie7HsQIcmhORXddTm7FHgZrS1qWN',
+//       }
+//     })
+//       .then(resp => {
+//         const hexKey = resp && resp.data && resp.data.pubkey;
 
-        if (typeof hexKey !== 'string') {
-          reject(new Error('Unable to obtain the receiver\'s public key.'));
-          return;
-        }
+//         if (typeof hexKey !== 'string') {
+//           reject(new Error('Unable to obtain the receiver\'s public key.'));
+//           return;
+//         }
 
-        // const pubkeyBytes = Buffer.from(hexKey, 'hex');
-        const pubkeyBytes = Buffer.from(hexKey, 'base64');
-        const receiverPubKey = libp2pCrypto.keys.unmarshalPublicKey(pubkeyBytes);
+//         // const pubkeyBytes = Buffer.from(hexKey, 'hex');
+//         // const pubkeyBytes = Buffer.from(hexKey, 'base64');
+//         const pubkeyBytes = Buffer.from(identityKey.publicKey);
+//         const receiverPubKey = libp2pCrypto.keys.unmarshalPublicKey(pubkeyBytes);
 
-        const Message = getProtoRoot().lookupType('Message');
-        const messagePb = generateMessage(messagePayload)
-        const serializedMessage = Message.encode(messagePb).finish();
+//         const Message = getProtoRoot().lookupType('Message');
+//         const messagePb = generateMessage(messagePayload);
+//         const serializedMessage = Message.encode(messagePb).finish();
 
-        console.log('pb serial');
-        window.pb = messagePb;
-        window.serial = serializedMessage;
+//         const signature = nacl.sign.detached(serializedMessage, identityKey.privateKey);
 
-        // todo: why does this bomb if I use the private key and it's forcing me
-        // to use a private property?
-        const signature = nacl.sign.detached(serializedMessage, identityKey._key);
+//         const Envelope = getProtoRoot().lookupType('Envelope');
+//         const envelopePayload = {
+//           message: messagePb,
+//           pubkey: identityKey.publicKey,
+//           signature,
+//         };        
 
-        const Envelope = getProtoRoot().lookupType('Envelope');
-        const envelopePayload = {
-          message: messagePb,
-          pubkey: identityKey.publicKey,
-          signature,
-        };        
+//         const envErr = Envelope.verify(envelopePayload);
 
-        const envErr = Envelope.verify(envelopePayload);
+//         if (envErr) {
+//           reject(new Error(`The envelope payload does not verify: ${envErr}`));
+//           return;
+//         }
 
-        if (envErr) {
-          reject(new Error(`The envelope payload does not verify: ${envErr}`));
-          return;
-        }
+//         const envelope = Envelope.create(envelopePayload);
+//         const serializedEnvelope = Envelope.encode(envelope).finish();
 
-        const envelope = Envelope.create(envelopePayload);
-        const serializedEnvelope = Envelope.encode(envelope).finish();
-
-        // TODO: does this make send as an alternate encode function in crypto.js?
-        // Generate ephemeral key
-        const ephemKeypair = nacl.box.keyPair();
+//         // Generate ephemeral key
+//         const ephemKeypair = nacl.box.keyPair();
         
-        // Convert to curve25519 pubkey
-        const pubkeyCurve = ed2curve.convertPublicKey(receiverPubKey._key);
+//         // Convert to curve25519 pubkey
+//         const pubkeyCurve = ed2curve.convertPublicKey(receiverPubKey._key);
         
-        // 24 bit random nonce
-        const nonce = new Uint8Array(crypto.randomBytes(24));
+//         // 24 bit random nonce
+//         const nonce = new Uint8Array(crypto.randomBytes(24));
         
-        // Create ciphertext
-        const cipherText = nacl.box(serializedEnvelope, nonce, pubkeyCurve, ephemKeypair.secretKey);
+//         // Create ciphertext
+//         const cipherText = nacl.box(serializedEnvelope, nonce, pubkeyCurve, ephemKeypair.secretKey);
 
-        console.log('the cy is boom');
-        window.boom = cipherText;
+//         const jointCiphertext = Buffer.concat([
+//           Buffer.from(nonce),
+//           Buffer.from(ephemKeypair.publicKey),
+//           Buffer.from(cipherText)
+//         ]);
 
-        // END: does this make send as an alternate encode function in crypto.js?
-        
-        // Append none and key
-        const jointCiphertext = Buffer.concat([
-          Buffer.from(nonce),
-          Buffer.from(ephemKeypair.publicKey),
-          Buffer.from(cipherText)
-        ]);
-
-        // resolve(jointCiphertext.toString('base64'));
-        resolve(jointCiphertext);
-      })
-      .catch(err => reject(err));
-  });
-}
+//         resolve(jointCiphertext.toString('base64'));
+//       })
+//       .catch(err => reject(err));
+//   });
+// }
 
 function generateMessage(payload, options = {}) {
   const opts = {
@@ -145,11 +136,11 @@ function getMessagePayload(messageType, urlType, value) {
   }
 }
 
-function generateChatMessage(peerId, payload, identityKey, options = {}) {
-  const opts = {
-    offline: false,
-    ...options,
-  };
+export function generateChatMessage(peerId, payload, identityKey, options) {
+  // const opts = {
+  //   offline: false,
+  //   ...options,
+  // };
 
   return new Promise((resolve, reject) => {
     const Chat = getProtoRoot().lookupType('Chat');
@@ -163,19 +154,18 @@ function generateChatMessage(peerId, payload, identityKey, options = {}) {
     const chat = Chat.create(payload);
     const serializedChat = Chat.encode(chat).finish();
     const messagePayload = getMessagePayload(1, 'Chat', serializedChat);
-    const howdy = messagePayload;
-    console.log('your chat message is howdy');
-    window.howdy = howdy;    
 
-    if (!opts.offline) {
-      resolve(generateMessage(messagePayload, { encode: true }));
-    } else {
-      return generateMessageEnvelope(peerId, identityKey, payload, options)
-        .then(
-          (...args) => resolve(...args),
-          (...args) => reject(...args)
-        );
-    }
+    resolve(generateMessage(messagePayload, options));
+
+    // if (!opts.offline) {
+    //   resolve(generateMessage(messagePayload, { encode: true }));
+    // } else {
+    //   return generateMessageEnvelope(peerId, identityKey, messagePayload, options)
+    //     .then(
+    //       (...args) => resolve(...args),
+    //       (...args) => reject(...args)
+    //     );
+    // }
   });  
 }
 
@@ -252,52 +242,53 @@ export function openDirectMessage(messagePb, peerId, node) {
 
 // todo: change identityKey to identity
 // expecting b64 message
-export function openOfflineMessage(message, identityKey) {
-  return new Promise((resolve, reject) => {
-    const nonce = message.slice(0,24);
-    const pubkey = message.slice(24,56);
-    const cipherText = message.slice(56, message.length);
-    const privKey = ed2curve.convertSecretKey(identityKey._key);
+// export function openOfflineMessage(message, identityKey) {
+//   return new Promise((resolve, reject) => {
+//     const messageBytes = Buffer.from(message, 'base64');
+//     const nonce = messageBytes.slice(0,24);
+//     const pubKey = messageBytes.slice(24,56);
+//     const cipherText = messageBytes.slice(56, messageBytes.length);
+//     const privKey = ed2curve.convertSecretKey(identityKey.privateKey);
 
-    const out = nacl.box.open(cipherText, nonce, pubkey, privKey);
+//     const out = nacl.box.open(cipherText, nonce, pubKey, privKey);
     
-    if (!out) {
-      reject(new Error('Unable to decrypt.'));
-    } else {
-      // console.log('zip - Decrypted ciphertext:', out);
-      // window.zip = out;
-    }
+//     if (!out) {
+//       reject(new Error('Unable to decrypt.'));
+//     } else {
+//       // console.log('zip - Decrypted ciphertext:', out);
+//       // window.zip = out;
+//     }
 
-    const EnvelopePb = getProtoRoot().lookupType('Envelope');
-    const envelope = EnvelopePb.decode(out);
+//     const EnvelopePb = getProtoRoot().lookupType('Envelope');
+//     const envelope = EnvelopePb.decode(out);
 
-    createFromPubKey(Buffer.from(envelope.pubkey), (err, data) => {
-      if (err) {
-        reject(err);
-        return;
-      }
+//     createFromPubKey(Buffer.from(envelope.pubkey), (err, data) => {
+//       if (err) {
+//         reject(err);
+//         return;
+//       }
 
-      const receiverId = toB58String(data.id);
+//       const receiverId = toB58String(data.id);
 
-      switch (envelope.message.messageType) {
-        case 1:
-          // chat message
-          resolve({
-            type: 'CHAT',
-            receiverId,
-            ...openChatMessage(envelope.message.payload.value),
-          });
-          break;
-        default:
-          reject(
-            new Error(
-              `Message type ${envelope.message.messageType} is not supported at this time.`
-            )
-          );
-      }
-    });
-  });
-}
+//       switch (envelope.message.messageType) {
+//         case 1:
+//           // chat message
+//           resolve({
+//             type: 'CHAT',
+//             receiverId,
+//             ...openChatMessage(envelope.message.payload.value),
+//           });
+//           break;
+//         default:
+//           reject(
+//             new Error(
+//               `Message type ${envelope.message.messageType} is not supported at this time.`
+//             )
+//           );
+//       }
+//     });
+//   });
+// }
 
 const ipfsRelayPeer =
   '/dns4/webchat.ob1.io/tcp/9999/wss/ipfs/QmSAumietCn85sF68xgCUtVS7UuZbyBi5LQPWqLe4vfwYb';
@@ -471,11 +462,7 @@ function sendStoreMessage(node, peerId, data) {
     getMessagePayload(18, 'CidList', CidList.encode(cidList).finish());
   const message = generateMessage(payload, { encode: true });
 
-  return sendMessage(
-    node,
-    peerId,
-    message
-  );
+  return sendMessage(node, peerId, message);
 }
 
 export function sendRequest(node, peerId, message, options = {}) {
@@ -485,12 +472,46 @@ export function sendRequest(node, peerId, message, options = {}) {
   });
 }
 
-export async function sendOfflineChatMessage(node, peerId, payload, options = {}) {
-  const envelope = await generateChatMessage(peerId, payload, node.__identity, {
-    ...options,
-    offline: true,
-  });
-  const envDigest = crypto.createHash('sha256').update(envelope).digest();
+// export async function sendOfflineChatMessage(node, peerId, payload, options = {}) {
+//   // const envelope = await generateChatMessage(peerId, payload, node.__identity, {
+//   //   ...options,
+//   //   offline: true,
+//   // });
+
+
+
+//   const envDigest = crypto.createHash('sha256').update(envelope).digest();
+//   const hexEnvDigest = envDigest.toString('hex');
+//   const envBuffer = Buffer.from(hexEnvDigest, 'hex');
+//   const { repoPath } = await node.repo.stat();
+//   const filePath = `${repoPath}/outbox/${hexEnvDigest}`;
+//   const files = await node.add([{
+//     path: filePath,
+//     content: envBuffer,
+//   }]);
+  
+//   const file = files.find(file => file.path === filePath); 
+
+//   if (!file || !file.hash) {
+//     throw new Error('Unable to obtain the file hash of the offline message.');
+//   }
+
+//   console.log(`the file hash is ${file.hash}`);
+
+//   await sendStoreMessage(node, pushNode, { cids: [file.hash] });
+
+//   // const pointer = ipfs.NewPointer(
+//   //   fromB58String(peerId),
+//   //   DefaultPointerPrefixLength, addr, ciphertext)
+
+//   // const pointerKey = createPointerKey(fromB58String(file.hash));
+//   // const cid = new CID(pointerKey);
+//   // console.log('the cid is manner');
+//   // window.manner = cid;
+// }
+
+async function storeOfflineMessage(node, peerId, msgBytes) {
+  const envDigest = crypto.createHash('sha256').update(msgBytes).digest();
   const hexEnvDigest = envDigest.toString('hex');
   const envBuffer = Buffer.from(hexEnvDigest, 'hex');
   const { repoPath } = await node.repo.stat();
@@ -508,18 +529,52 @@ export async function sendOfflineChatMessage(node, peerId, payload, options = {}
 
   console.log(`the file hash is ${file.hash}`);
 
-  const supper = fromB58String(file.hash);
-  console.log('supper is ready jack.');
-  window.supper = supper;
-
   await sendStoreMessage(node, pushNode, { cids: [file.hash] });
 
-  // const pointer = ipfs.NewPointer(
-  //   fromB58String(peerId),
-  //   DefaultPointerPrefixLength, addr, ciphertext)
+  return multiaddr(`/ipfs/${file.hash}/`);
+}
 
-  // const pointerKey = createPointerKey(fromB58String(file.hash));
-  // const cid = new CID(pointerKey);
-  // console.log('the cid is manner');
-  // window.manner = cid;
+export async function sendOfflineMessage(node, peerId, pubKeyBytes, messagePb) {
+  const serializedMessage = getProtoRoot()
+    .lookupType('Message')
+    .encode(messagePb).finish();
+  console.log('the node is mode');
+  window.mode = node;
+  const signature = nacl.sign.detached(serializedMessage, node.__identity.privateKey);
+
+  const Envelope = getProtoRoot().lookupType('Envelope');
+  const envelopePayload = {
+    message: messagePb,
+    pubkey: node.__identity.publicKey,
+    signature,
+  };        
+  const envErr = Envelope.verify(envelopePayload);
+
+  if (envErr) {
+    throw new Error(`The envelope payload does not verify: ${envErr}`);
+  }
+
+  const envelope = Envelope.create(envelopePayload);
+  const serializedEnvelope = Envelope.encode(envelope).finish();
+  const cipherText = encrypt(pubKeyBytes, serializedEnvelope);
+
+  const mAddr = await storeOfflineMessage(node, peerId, cipherText);
+  console.log(`the addr is skipper: ${mAddr}`);
+  window.skipper = mAddr;
+  
+  let pointer = newPointer(fromB58String(peerId), mAddr, cipherText);
+  pointer = {
+    Purpose: 1,
+    CancelID: peerId,
+    ...pointer,
+  }
+
+  console.log('the pointer is point');
+  window.point = pointer;
+}
+
+export async function sendOfflineChatMessage(node, peerId, data, options = {}) {
+  const messagePb = await generateChatMessage(peerId, data, node.__identity, { encode: false });
+  const pubkeyBytes = Buffer.from('CAESIOd4zikCvE0qQdb1ie7HsQIcmhORXddTm7FHgZrS1qWN', 'base64');
+  return sendOfflineMessage(node, peerId, pubkeyBytes, messagePb);
 }
