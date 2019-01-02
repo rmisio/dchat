@@ -139,6 +139,9 @@ class Conversation extends Component {
             </div>
           </div>
         </div>
+        <div className="row">
+          <button onClick={() => this.props.onClickCheckDht(this.props.receiver)}>Check DHT</button>
+        </div>
         {failedInfo}
       </div>
     );

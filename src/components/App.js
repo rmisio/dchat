@@ -8,7 +8,10 @@ import uuid4 from 'uuid/v4';
 import crypto from 'crypto';
 import protobuf from 'protobufjs';
 import IPFS from 'ipfs';
-import { createFromBytes } from 'peer-id'
+import {
+  createFromBytes,
+  createFromB58String,
+} from 'peer-id';
 import { fromByteArray } from 'base64-js';
 import multihashes from 'multihashes';
 import pull from 'pull-stream';
@@ -20,7 +23,6 @@ import {
   relayConnect,
   openDirectMessage,
   sendChatMessage,
-  sendOfflineMessage,
   sendOfflineChatMessage,
 } from '../util/messaging';
 import jsonDescriptor from '../message.json';
@@ -40,6 +42,8 @@ class App extends Component {
       userId: null,
       chats: {},
     };
+
+    // "ipfs": "github:ipfs/js-ipfs#master",
 
     // this.state.chats = {
     //   'QmVjLM8ieNfQfXGoA3E616qnQVziDk1J1Sbz2PCkFeGAay': {
@@ -78,6 +82,8 @@ class App extends Component {
     this.handleRegenerate = this.handleRegenerate.bind(this);
     this.handleStartChat = this.handleStartChat.bind(this);
     this.handleChatSend = this.handleChatSend.bind(this);
+    this.handleConvoDidMount = this.handleConvoDidMount.bind(this);
+    this.handleClickCheckDht = this.handleClickCheckDht.bind(this);
 
     this.generateRegisterSeed();
   }
@@ -148,7 +154,8 @@ class App extends Component {
 
     return {
       EXPERIMENTAL: {
-        pubsub: true
+        pubsub: true,
+        dht: true,
       },
       relay: {
         "enabled": true,
@@ -223,9 +230,25 @@ class App extends Component {
             console.log('id me brah');
             window.id = identity;
 
+            const val = `${peerId} - slick willy willy`;
+
+            node._libp2pNode.dht.put(
+              identity.peerId,
+              Buffer.from(val),
+              err => {
+                if (err) {
+                  throw err;
+                }
+
+                console.log(`"${val}" has been stored in the dht. Kudos.`);
+              }
+            );
+
             this.setState({ userId: peerId });
 
             relayConnect(this.node);
+
+            // "ipfs": "github:ipfs/js-ipfs#feat/dht-part-ii",
             
             // handle incoming messages
             node._libp2pNode.handle('/openbazaar/app/1.0.0', (protocol, conn) => {
@@ -500,6 +523,22 @@ class App extends Component {
     this.updateChat(receiver, { unread: 0 });
   }
 
+  handleClickCheckDht(receiver) {
+    console.log(`checking the dht for ${receiver}`);
+
+    this.node._libp2pNode.dht.get(
+      createFromB58String(receiver).id,
+      {},
+      (err, content) => {
+        if (err) {
+          throw err;
+        }
+
+        console.log(`for ${receiver} the dht has "${content.toString()}"`);
+      }
+    );
+  }
+
   generateRegisterSeed() {
     generatePeerId()
       .then(
@@ -594,6 +633,7 @@ class App extends Component {
                   ...convoState,
                   receiver,
                   onChatSend: this.handleChatSend,
+                  onClickCheckDht: this.handleClickCheckDht,
                   componentDidMount: () => this.handleConvoDidMount(receiver),
                 })(props);
               }
