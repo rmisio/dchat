@@ -231,17 +231,16 @@ class App extends Component {
             window.id = identity;
 
             const checkPeers = () => {
-              return;
               const peersYo = node._libp2pNode.stats.peers();
               console.log(`you are connected to ${peersYo.length} peers:`)
               console.log(peersYo);
             };
 
-            setTimeout(() => {
-              checkPeers();
-            }, 3000);
+            // setTimeout(() => {
+            //   checkPeers();
+            // }, 3000);
 
-            setInterval(checkPeers, 15000);
+            // setInterval(checkPeers, 15000);
 
             const val = `${peerId} - slick willy willy`;
 
