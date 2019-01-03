@@ -138,7 +138,7 @@ function getMessagePayload(messageType, urlType, value) {
 
 export function generateChatMessage(peerId, payload, identityKey, options) {
   // const opts = {
-  //   offline: false,
+  //   encode: true,
   //   ...options,
   // };
 
@@ -422,6 +422,9 @@ export async function sendChatMessage(node, peerId, payload) {
     peerId,
     payload,
     node.__identity,
+    {
+      encode: true,
+    }
   );
 
   return sendMessage(node, peerId, chatMsg);
