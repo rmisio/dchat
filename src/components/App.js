@@ -44,6 +44,7 @@ class App extends Component {
     };
 
     // "ipfs": "github:ipfs/js-ipfs#master",
+    // "ipfs": "github:ipfs/js-ipfs#feat/dht-part-ii",    
 
     // this.state.chats = {
     //   'QmVjLM8ieNfQfXGoA3E616qnQVziDk1J1Sbz2PCkFeGAay': {
@@ -204,6 +205,17 @@ class App extends Component {
     }
   }
 
+  checkPeers() {
+    if (!this.node) {
+      throw new Error('Unable to check peers because there is ' +
+        'no active node instance.');
+    }
+
+    const peersYo = this.node._libp2pNode.stats.peers();
+    console.log(`you are connected to ${peersYo.length} peers.`);
+    // console.log(peersYo);
+  }
+
   handleLogin(seed) {
     if (!seed || typeof seed !== 'string') {
       alert('I\'m gonna need a seed slick willy!');
@@ -230,18 +242,6 @@ class App extends Component {
             console.log('id me brah');
             window.id = identity;
 
-            const checkPeers = () => {
-              const peersYo = node._libp2pNode.stats.peers();
-              console.log(`you are connected to ${peersYo.length} peers:`)
-              console.log(peersYo);
-            };
-
-            // setTimeout(() => {
-            //   checkPeers();
-            // }, 3000);
-
-            // setInterval(checkPeers, 15000);
-
             const val = `${peerId} - slick willy willy`;
 
             node._libp2pNode.dht.put(
@@ -260,8 +260,6 @@ class App extends Component {
 
             relayConnect(this.node);
 
-            // "ipfs": "github:ipfs/js-ipfs#feat/dht-part-ii",
-            
             // handle incoming messages
             node._libp2pNode.handle('/openbazaar/app/1.0.0', (protocol, conn) => {
               console.log('pulling in incoming message');
@@ -537,6 +535,8 @@ class App extends Component {
 
   handleClickCheckDht(receiver) {
     console.log(`checking the dht for ${receiver}`);
+
+    this.checkPeers();
 
     this.node._libp2pNode.dht.get(
       createFromB58String(receiver).id,
